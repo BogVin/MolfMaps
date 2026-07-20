@@ -1,0 +1,35 @@
+<header class="site-header">
+  <span class="brand">MolfMaps</span>
+  <nav class="session-nav" aria-label="Session">
+    @if (sessionError()) {
+      <span class="session-error" role="status">{{ sessionError() }}</span>
+    }
+    @if (sessionLoading()) {
+      <span class="session-badge">Checking session…</span>
+    } @else if (authenticated()) {
+      <span class="session-badge">Logged in</span>
+      <button class="btn btn-secondary" type="button" (click)="logout()">Logout</button>
+    } @else {
+      <a class="btn-link" routerLink="/login">Login</a>
+    }
+  </nav>
+</header>
+
+<main class="map-stage">
+  @if (!mapFailed()) {
+    <img
+      class="map-image"
+      [src]="mapUrl"
+      alt="Main map of Kal"
+      (error)="onMapError()"
+      (load)="onMapLoad($any($event.target))"
+    />
+  } @else {
+    <div class="map-fallback">
+      <div class="map-fallback__card">
+        <h1>Map unavailable</h1>
+        <p>The main map couldn't be loaded right now. Please try again later.</p>
+      </div>
+    </div>
+  }
+</main>

@@ -1,0 +1,42 @@
+<header class="site-header">
+  <a class="brand" routerLink="/" style="text-decoration: none; color: inherit">MolfMaps</a>
+</header>
+
+<main class="login-wrap">
+  @if (checkingSession()) {
+    <p class="session-badge">Checking session…</p>
+  } @else {
+    <form class="login-card" (ngSubmit)="onSubmit()" novalidate>
+      <h1>Admin login</h1>
+      <div class="form-error" role="alert" aria-live="polite">{{ error() }}</div>
+
+      <div class="field">
+        <label for="username">Username</label>
+        <input
+          id="username"
+          name="username"
+          type="text"
+          autocomplete="username"
+          [(ngModel)]="username"
+          required
+        />
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          autocomplete="current-password"
+          [(ngModel)]="password"
+          required
+        />
+      </div>
+
+      <button class="btn" type="submit" [disabled]="submitting()">
+        {{ submitting() ? 'Logging in…' : 'Log in' }}
+      </button>
+    </form>
+  }
+</main>
