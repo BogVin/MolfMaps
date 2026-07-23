@@ -1,9 +1,9 @@
 # MolfMaps Frontend (Angular)
 
 This Angular application is the **sole active frontend** for MolfMaps. It
-provides the public map landing page and admin login/logout against the existing
-FastAPI backend (`GET /api/map`, `POST /api/login`, `POST /api/logout`,
-`GET /api/session`).
+provides the public map landing and catalog pages plus admin login/logout against
+the FastAPI backend (`GET /api/map`, `GET /api/maps`, `POST /api/login`,
+`POST /api/logout`, `GET /api/session`).
 
 ## Prerequisites
 
@@ -42,10 +42,11 @@ via the Angular dev proxy (`proxy.conf.json`).
 
 ### Routes
 
-| Path     | Purpose                          |
-|----------|----------------------------------|
-| `/`      | Public home — main map landing   |
-| `/login` | Admin login form                 |
+| Path     | Purpose                           |
+|----------|-----------------------------------|
+| `/`      | Public home — main map landing    |
+| `/maps`  | Public catalog of available maps |
+| `/login` | Admin login form                  |
 
 ## Optional: single-origin production build
 
