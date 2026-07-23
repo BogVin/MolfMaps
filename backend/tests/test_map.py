@@ -1,8 +1,7 @@
-"""Contract tests for GET /api/map (FR-001, FR-012, SC-006)."""
+"""Contract tests for the public map asset and catalog endpoints."""
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 import app.routes.assets as assets_route
@@ -15,6 +14,33 @@ def test_map_served_when_present(configured_client):
     assert res.status_code == 200
     assert res.headers["content-type"] == "image/webp"
     assert len(res.content) > 0
+
+
+def test_maps_list_is_public_and_describes_available_maps(unconfigured_client):
+    res = unconfigured_client.get("/api/maps")
+
+    assert res.status_code == 200
+    assert res.json() == {
+        "maps": [
+            {
+                "id": "kal-main",
+                "title": "Main map of Kal",
+                "image_url": "/api/map",
+            }
+        ]
+    }
+
+
+def test_maps_list_is_empty_when_asset_is_missing(
+    configured_client, tmp_path, monkeypatch
+):
+    missing = tmp_path / "kal_main_map.webp"
+    monkeypatch.setattr(assets_route, "MAP_ASSET_PATH", missing)
+
+    res = configured_client.get("/api/maps")
+
+    assert res.status_code == 200
+    assert res.json() == {"maps": []}
 
 
 def test_map_404_when_missing(configured_client, tmp_path, monkeypatch):
