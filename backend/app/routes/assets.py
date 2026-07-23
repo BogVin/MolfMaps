@@ -1,4 +1,4 @@
-"""Public asset endpoint: serves the landing map (FR-001, FR-012)."""
+"""Public map endpoints for the landing image and maps catalog."""
 
 from __future__ import annotations
 
@@ -7,11 +7,26 @@ from pathlib import Path
 from fastapi import APIRouter
 from fastapi.responses import FileResponse, JSONResponse
 
-from ..models import ErrorResponse
+from ..models import ErrorResponse, MapSummary, MapsListResponse
 
 router = APIRouter(prefix="/api", tags=["assets"])
 
 MAP_ASSET_PATH = Path(__file__).resolve().parent.parent.parent / "assets" / "kal_main_map.webp"
+
+
+@router.get("/maps", response_model=MapsListResponse)
+def get_maps() -> MapsListResponse:
+    """List every map asset currently available to public visitors."""
+    maps = []
+    if MAP_ASSET_PATH.is_file():
+        maps.append(
+            MapSummary(
+                id="kal-main",
+                title="Main map of Kal",
+                image_url="/api/map",
+            )
+        )
+    return MapsListResponse(maps=maps)
 
 
 @router.get(
