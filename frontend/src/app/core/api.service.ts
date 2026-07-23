@@ -2,12 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-import {
-  LoginResponse,
-  MapsListResponse,
-  MessageResponse,
-  SessionResponse,
-} from './api.types';
+import { LoginResponse, MapsListResponse, MessageResponse, SessionResponse } from './api.types';
 
 /**
  * Thin HttpClient wrappers around the MolfMaps REST API.
@@ -39,10 +34,6 @@ export class ApiService {
   }
 
   logout(): Observable<MessageResponse> {
-    return this.http.post<MessageResponse>(
-      '/api/logout',
-      {},
-      { withCredentials: true },
-    );
+    return this.http.post<MessageResponse>('/api/logout', {}, { withCredentials: true });
   }
 }

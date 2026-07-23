@@ -42,11 +42,11 @@ via the Angular dev proxy (`proxy.conf.json`).
 
 ### Routes
 
-| Path     | Purpose                           |
-|----------|-----------------------------------|
-| `/`      | Public home — main map landing    |
+| Path     | Purpose                          |
+| -------- | -------------------------------- |
+| `/`      | Public home — main map landing   |
 | `/maps`  | Public catalog of available maps |
-| `/login` | Admin login form                  |
+| `/login` | Admin login form                 |
 
 ## Optional: single-origin production build
 
@@ -66,11 +66,11 @@ for day-to-day development.
 
 ## Scripts
 
-| Command          | Description                                      |
-|------------------|--------------------------------------------------|
-| `npm start`      | Dev server with `/api` proxy to `:8000`          |
-| `npm run build`  | Production build → `dist/frontend/`              |
-| `npm test`       | Unit tests (Vitest)                              |
+| Command         | Description                             |
+| --------------- | --------------------------------------- |
+| `npm start`     | Dev server with `/api` proxy to `:8000` |
+| `npm run build` | Production build → `dist/frontend/`     |
+| `npm test`      | Unit tests (Vitest)                     |
 
 ## Notes
 
