@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 
 import {
   LoginResponse,
+  MapsListResponse,
   MessageResponse,
   SessionResponse,
 } from './api.types';
@@ -18,6 +19,10 @@ export class ApiService {
   readonly mapUrl = '/api/map';
 
   private readonly http = inject(HttpClient);
+
+  getMaps(): Observable<MapsListResponse> {
+    return this.http.get<MapsListResponse>('/api/maps');
+  }
 
   getSession(): Observable<SessionResponse> {
     return this.http.get<SessionResponse>('/api/session', {

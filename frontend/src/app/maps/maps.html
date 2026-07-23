@@ -1,0 +1,47 @@
+<header class="site-header">
+  <a class="brand brand-link" routerLink="/">MolfMaps</a>
+  <nav class="session-nav" aria-label="Primary navigation">
+    <a class="nav-link" routerLink="/">Home</a>
+    <a class="btn-link" routerLink="/login">Login</a>
+  </nav>
+</header>
+
+<main class="maps-page" aria-labelledby="maps-heading">
+  <div class="maps-page__heading">
+    <h1 id="maps-heading">All maps</h1>
+    <p>Explore every map currently available in MolfMaps.</p>
+  </div>
+
+  @if (loading()) {
+    <div class="maps-state" role="status">Loading maps…</div>
+  } @else if (error()) {
+    <div class="maps-state maps-state--error" role="alert">
+      <p>{{ error() }}</p>
+      <button class="btn" type="button" (click)="loadMaps()">Try again</button>
+    </div>
+  } @else if (maps().length === 0) {
+    <div class="maps-state">No maps are available right now.</div>
+  } @else {
+    <div class="maps-grid">
+      @for (map of maps(); track map.id) {
+        <article class="map-card">
+          @if (!failedMapIds().has(map.id)) {
+            <img
+              class="map-card__image"
+              [src]="map.image_url"
+              [alt]="map.title"
+              (error)="onMapError(map.id)"
+              (load)="onMapLoad(map.id, $any($event.target))"
+            />
+          } @else {
+            <div class="map-card__fallback">Preview unavailable</div>
+          }
+          <div class="map-card__content">
+            <h2>{{ map.title }}</h2>
+            <a class="nav-link" [href]="map.image_url">Open full-size map</a>
+          </div>
+        </article>
+      }
+    </div>
+  }
+</main>

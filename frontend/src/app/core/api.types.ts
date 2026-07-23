@@ -1,4 +1,4 @@
-/** API DTOs matching contracts/openapi.yaml (unchanged from 001). */
+/** API DTOs matching the FastAPI/OpenAPI contract. */
 
 export interface LoginRequest {
   username: string;
@@ -15,6 +15,16 @@ export interface SessionResponse {
 
 export interface MessageResponse {
   detail: string;
+}
+
+export interface MapSummary {
+  id: string;
+  title: string;
+  image_url: string;
+}
+
+export interface MapsListResponse {
+  maps: MapSummary[];
 }
 
 export interface ErrorResponse {
