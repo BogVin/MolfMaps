@@ -2,11 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-import {
-  LoginResponse,
-  MessageResponse,
-  SessionResponse,
-} from './api.types';
+import { LoginResponse, MapsListResponse, MessageResponse, SessionResponse } from './api.types';
 
 /**
  * Thin HttpClient wrappers around the MolfMaps REST API.
@@ -18,6 +14,10 @@ export class ApiService {
   readonly mapUrl = '/api/map';
 
   private readonly http = inject(HttpClient);
+
+  getMaps(): Observable<MapsListResponse> {
+    return this.http.get<MapsListResponse>('/api/maps');
+  }
 
   getSession(): Observable<SessionResponse> {
     return this.http.get<SessionResponse>('/api/session', {
@@ -34,10 +34,6 @@ export class ApiService {
   }
 
   logout(): Observable<MessageResponse> {
-    return this.http.post<MessageResponse>(
-      '/api/logout',
-      {},
-      { withCredentials: true },
-    );
+    return this.http.post<MessageResponse>('/api/logout', {}, { withCredentials: true });
   }
 }
