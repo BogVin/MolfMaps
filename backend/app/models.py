@@ -30,6 +30,20 @@ class MessageResponse(BaseModel):
     detail: str
 
 
+class MapSummary(BaseModel):
+    """Public metadata needed to render one entry in the maps catalog."""
+
+    id: str
+    title: str
+    image_url: str
+
+
+class MapsListResponse(BaseModel):
+    """Public catalog of map assets currently available to visitors."""
+
+    maps: list[MapSummary]
+
+
 class ErrorResponse(BaseModel):
     """Generic, non-revealing error (FR-006)."""
 

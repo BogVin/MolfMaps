@@ -42,7 +42,7 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="MolfMaps API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="MolfMaps API", version="0.2.0", lifespan=lifespan)
 
 app.include_router(assets.router)
 app.include_router(auth.router)
