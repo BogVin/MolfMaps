@@ -24,8 +24,7 @@ body {
   flex-direction: column;
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
 app-root {
@@ -55,6 +54,11 @@ app-root {
   font-size: 1.1rem;
 }
 
+.brand-link {
+  color: var(--text);
+  text-decoration: none;
+}
+
 .session-nav {
   display: flex;
   align-items: center;
@@ -64,6 +68,15 @@ app-root {
 .session-badge {
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.nav-link {
+  color: var(--text);
+  text-underline-offset: 0.2em;
+}
+
+.nav-link:hover {
+  color: var(--accent-hover);
 }
 
 .btn-link,
@@ -142,6 +155,87 @@ app-root {
 .map-fallback__card p {
   margin: 0;
   color: var(--muted);
+}
+
+/* Public maps catalog */
+.maps-page {
+  width: min(72rem, 100%);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 5.5rem 1.5rem 3rem;
+}
+
+.maps-page__heading {
+  margin-bottom: 2rem;
+}
+
+.maps-page__heading h1 {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.8rem, 4vw, 2.5rem);
+}
+
+.maps-page__heading p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.maps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  gap: 1.25rem;
+}
+
+.map-card {
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+}
+
+.map-card__image,
+.map-card__fallback {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+}
+
+.map-card__image {
+  display: block;
+  object-fit: contain;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.map-card__fallback {
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.map-card__content {
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+.map-card__content h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+}
+
+.maps-state {
+  padding: 2rem;
+  color: var(--muted);
+  text-align: center;
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+}
+
+.maps-state--error {
+  color: var(--error);
+}
+
+.maps-state--error p {
+  margin: 0 0 1rem;
 }
 
 /* Login page */
