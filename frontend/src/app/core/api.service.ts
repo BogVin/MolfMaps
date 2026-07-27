@@ -15,8 +15,6 @@ import {
  */
 @Injectable({ providedIn: 'root' })
 export class ApiService {
-  readonly mapUrl = '/api/map';
-
   private readonly http = inject(HttpClient);
 
   getSession(): Observable<SessionResponse> {

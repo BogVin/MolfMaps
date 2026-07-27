@@ -11,25 +11,12 @@ import { ApiService } from '../core/api.service';
 export class Home implements OnInit {
   private readonly api = inject(ApiService);
 
-  readonly mapUrl = this.api.mapUrl;
-  readonly mapFailed = signal(false);
   readonly authenticated = signal(false);
   readonly sessionLoading = signal(true);
   readonly sessionError = signal('');
 
   ngOnInit(): void {
     this.refreshSession();
-  }
-
-  onMapError(): void {
-    this.mapFailed.set(true);
-  }
-
-  onMapLoad(img: HTMLImageElement): void {
-    // Cached error: image finished loading as broken before/without error event.
-    if (img.naturalWidth === 0) {
-      this.mapFailed.set(true);
-    }
   }
 
   logout(): void {
