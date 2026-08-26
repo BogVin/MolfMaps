@@ -1,0 +1,19 @@
+<p class="poi-popup__text">{{ annotation().text }}</p>
+
+@for (image of annotation().images; track image.id) {
+  @if (isBroken(image.id)) {
+    <p class="poi-popup__missing">This image couldn't be loaded.</p>
+  } @else {
+    <img
+      class="poi-popup__image"
+      [src]="image.image_url"
+      alt=""
+      (error)="onImageError(image.id)"
+      (load)="onImageLoad(image.id, $any($event.target))"
+    />
+  }
+}
+
+<button type="button" class="btn btn-secondary poi-popup__close" (click)="onDismiss()">
+  Close
+</button>

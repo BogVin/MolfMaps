@@ -1,0 +1,158 @@
+---
+description: Unit testing principles - AAA pattern, mocking strategy, coverage targets
+alwaysApply: true
+---
+
+# Unit Testing Principles
+
+## Overview
+
+Unit testing ensures code reliability, catches bugs early, and serves as documentation.
+
+**Key Metrics:**
+- **Coverage Target:** >80% for all code
+- **Critical Paths:** 90%+ coverage required
+- **Test-to-Code Ratio:** ~1:1 for non-trivial code
+- **Pass Rate:** 100% in all environments
+
+## The AAA Pattern
+
+Every test follows **Arrange-Act-Assert**:
+
+```
+request = createValidRequest(email: "user@example.com")
+mockRepo = mock(UserRepository)
+handler  = new UserHandler(mockRepo)
+
+result = handler.handle(request)
+
+assert result.id > 0
+assert result.email == "user@example.com"
+```
+
+The pattern is the same regardless of language or framework — only the syntax changes. Set up inputs, call the method, verify the output.
+
+## Test Naming
+
+Test names should describe:
+- **What** is being tested (method/component)
+- **The condition** (scenario)
+- **The expected result** (outcome)
+
+**Format:** `{MethodName}_{Condition}_{ExpectedResult}`
+
+**Examples:**
+```
+CreateUser_WithValidEmail_ReturnsCreatedUser
+CreateUser_WithDuplicateEmail_ThrowsValidationException
+CalculateDiscount_ForPremiumUser_Returns20Percent
+UserForm_OnSubmitWithValidData_CallsOnSubmitCallback
+```
+
+## Mocking Strategy
+
+### When to Mock
+
+**Mock:**
+- External services (HTTP clients, databases, APIs)
+- Time-dependent functions (DateTime.Now, Date.now)
+- Random or non-deterministic behavior
+- Error scenarios (simulate failures)
+- Expensive operations (filesystem, network)
+
+**Don't Mock:**
+- Simple utility functions (math, formatting)
+- Value objects or simple entities
+- The system under test itself
+- Logging (verify it's called, not content)
+
+> **Framework-specific examples:** For complete mocking patterns and test examples in your stack, see your stack's testing rule (e.g., `dotnet-backend/rules/nunit-testing.mdc` for NUnit/Moq, `react-frontend/rules/vitest-testing.mdc` for Vitest).
+
+## Test Scenarios
+
+For every public method, cover these categories:
+
+### 1. Happy Path
+The expected, successful flow with valid inputs. Verify the correct result is returned and any expected side effects occur.
+
+### 2. Validation Failures
+Invalid inputs: empty strings, malformed data, values exceeding limits. Verify the correct error or validation message is returned.
+
+### 3. Business Logic Failures
+Scenarios where the input is valid but business rules prevent success — e.g., duplicate records, insufficient permissions, expired tokens.
+
+### 4. Edge Cases
+Boundary values (0, -1, MAX_INT), extreme inputs, and uncommon but valid scenarios.
+
+### 5. Null/Empty Handling
+Null arguments, empty strings, empty collections. Verify graceful handling or appropriate errors.
+
+### 6. Error Scenarios
+Dependency failures (database down, network timeout). Verify errors propagate or are handled correctly.
+
+## Coverage Requirements
+
+### Coverage Levels
+
+```
+Critical Paths:    >=90% (payment, auth, reports)
+Core Features:     >=80% (normal business logic)
+Utilities:         >=70% (formatting, helpers)
+Tests themselves:  Not required to test
+Generated code:    May exclude from coverage
+```
+
+## Test Organization
+
+### File Structure
+
+Tests mirror source files. Backend tests go in a parallel `tests/` directory; frontend tests sit alongside the component:
+
+```
+Backend:  src/Services/Users/CreateUserHandler.cs
+          tests/Services/Users/CreateUserHandlerTests.cs
+
+Frontend: src/components/UserForm.tsx
+          src/components/UserForm.test.tsx
+```
+
+### Test Class Organization
+
+Within a test class, group tests in a consistent order: setup first, then happy-path tests, validation tests, error scenarios, and edge cases. Use your framework's setup/teardown hooks (e.g., `[SetUp]`, `beforeEach`) to initialize shared fixtures — never use constructors or shared mutable state.
+
+## Common Testing Mistakes
+
+### Don't:
+- Test implementation details (private methods)
+- Use Thread.Sleep / setTimeout for timing
+- Share state between tests
+- Over-mock (mock everything)
+- Write tests without assertions
+- Ignore test failures
+- Have random/non-deterministic tests
+
+### Do:
+- Test public behavior only
+- Use async/await for timing
+- Isolate each test
+- Mock only external dependencies
+- Clear assertions on every test
+- Fix failing tests immediately
+- Make tests deterministic and repeatable
+
+## Test Quality Checklist
+
+Every test should:
+- [ ] Test one thing (one assertion concept)
+- [ ] Have a clear name explaining scenario
+- [ ] Follow AAA pattern
+- [ ] Not depend on other tests
+- [ ] Run in any order, any number of times
+- [ ] Be reasonably fast (<100ms typical)
+- [ ] Have clear failure messages
+- [ ] Use realistic test data
+- [ ] Clean up after itself
+
+---
+
+**See Also:** core/rules/playwright-testing.mdc, core/agents/unit-tester.md, core/agents/playwright-tester.md

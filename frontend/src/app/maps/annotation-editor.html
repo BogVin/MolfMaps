@@ -1,0 +1,137 @@
+<form class="annotation-editor" (ngSubmit)="onSubmit()">
+  <h2 class="annotation-editor__title">{{ title() }}</h2>
+
+  <div class="field">
+    <label for="annotation-text">{{ isTextLink() ? 'Label text' : 'Description' }}</label>
+    @if (isTextLink()) {
+      <input
+        id="annotation-text"
+        name="text"
+        type="text"
+        autocomplete="off"
+        [maxlength]="maxTextLength()"
+        [ngModel]="draft().text"
+        (ngModelChange)="onTextChange($event)"
+      />
+    } @else {
+      <textarea
+        id="annotation-text"
+        name="text"
+        rows="4"
+        [maxlength]="maxTextLength()"
+        [ngModel]="draft().text"
+        (ngModelChange)="onTextChange($event)"
+      ></textarea>
+    }
+    @if (textError()) {
+      <p class="form-error">{{ textError() }}</p>
+    }
+  </div>
+
+  @if (isTextLink()) {
+    <div class="field">
+      <label for="annotation-target">Opens this map</label>
+      <select
+        id="annotation-target"
+        name="target"
+        [ngModel]="draft().targetMapId"
+        (ngModelChange)="onTargetChange($event)"
+      >
+        <option value="">Choose a map…</option>
+        @for (target of targets(); track target.id) {
+          <option [value]="target.id">{{ target.name }}</option>
+        }
+      </select>
+      @if (targetError()) {
+        <p class="form-error">{{ targetError() }}</p>
+      }
+    </div>
+
+    <div class="field">
+      <label for="annotation-size">Text size</label>
+      <!-- Bound to the saved range, so pushing past either end stops at the limit. -->
+      <input
+        id="annotation-size"
+        name="size"
+        type="range"
+        [min]="minTextScale"
+        [max]="maxTextScale"
+        [step]="textScaleStep"
+        [ngModel]="draft().textScale"
+        (ngModelChange)="onTextScaleChange($event)"
+      />
+      <p class="annotation-editor__hint">
+        The label previews on the map at this size before you save.
+      </p>
+    </div>
+  } @else {
+    <div class="field">
+      <label for="annotation-images">Images</label>
+      <ul class="annotation-editor__images">
+        @for (image of draft().images; track image.id) {
+          <li>
+            <img class="annotation-editor__thumb" [src]="image.image_url" alt="" />
+            <button
+              class="btn btn-secondary"
+              type="button"
+              (click)="onRemoveImage(image)"
+            >
+              Remove
+            </button>
+          </li>
+        }
+        @for (file of draft().pendingImages; track $index) {
+          <li>
+            <span class="annotation-editor__pending">{{ file.name }}</span>
+            <button class="btn btn-secondary" type="button" (click)="onRemovePending($index)">
+              Remove
+            </button>
+          </li>
+        }
+      </ul>
+      <input
+        id="annotation-images"
+        name="images"
+        type="file"
+        accept="image/webp,image/png,image/jpeg,image/gif"
+        multiple
+        (change)="onFilesChosen($any($event.target))"
+      />
+      <p class="annotation-editor__hint">
+        Images are attached once the point of interest is saved.
+      </p>
+    </div>
+  }
+
+  @if (serverError()) {
+    <p class="form-error">{{ serverError() }}</p>
+  }
+
+  <div class="annotation-editor__actions">
+    <button class="btn" type="submit" [disabled]="saving()">
+      {{ saving() ? 'Saving…' : 'Save' }}
+    </button>
+    <button class="btn btn-secondary" type="button" (click)="onCancel()">Cancel</button>
+  </div>
+
+  @if (isEditing()) {
+    <div class="annotation-editor__actions">
+      <button class="btn btn-secondary" type="button" (click)="onMove()">Move</button>
+      @if (confirmingDelete()) {
+        <button class="btn btn-danger" type="button" (click)="onDeleteConfirm()">
+          Confirm delete
+        </button>
+        <button class="btn btn-secondary" type="button" (click)="onDeleteCancel()">
+          Keep
+        </button>
+      } @else {
+        <button class="btn btn-secondary" type="button" (click)="onDeleteRequest()">
+          Delete
+        </button>
+      }
+    </div>
+    @if (confirmingDelete()) {
+      <p class="annotation-editor__hint">Deleting is permanent and cannot be undone.</p>
+    }
+  }
+</form>

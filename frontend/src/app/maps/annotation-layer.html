@@ -1,0 +1,43 @@
+@for (link of textLinks(); track link.id) {
+  <button
+    type="button"
+    class="annotation-label"
+    [class.annotation-label--unavailable]="!link.target_available"
+    [style.left.%]="link.x * 100"
+    [style.top.%]="link.y * 100"
+    [style.font-size.px]="fontSize(link.text_scale)"
+    [attr.aria-label]="describe(link)"
+    (pointerdown)="onPointerDown($event)"
+    (click)="onActivate($event, link)"
+  >
+    {{ link.text }}
+  </button>
+}
+
+@for (point of points(); track point.id) {
+  <button
+    type="button"
+    class="annotation-marker"
+    [class.annotation-marker--open]="openPopupId() === point.id"
+    [attr.data-annotation-id]="point.id"
+    [style.left.%]="point.x * 100"
+    [style.top.%]="point.y * 100"
+    [style.transform]="'translate(-50%, -50%) scale(' + counterScale() + ')'"
+    [attr.aria-expanded]="openPopupId() === point.id"
+    [attr.aria-label]="describePoint(point)"
+    (pointerdown)="onPointerDown($event)"
+    (click)="onActivate($event, point)"
+  ></button>
+}
+
+@if (preview(); as draft) {
+  <span
+    class="annotation-label annotation-label--preview"
+    aria-hidden="true"
+    [style.left.%]="draft.x * 100"
+    [style.top.%]="draft.y * 100"
+    [style.font-size.px]="fontSize(draft.textScale)"
+  >
+    {{ draft.text || 'Label' }}
+  </span>
+}

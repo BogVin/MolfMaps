@@ -1,0 +1,192 @@
+<header class="site-header site-header--solid">
+  <a class="brand" routerLink="/">MolfMaps</a>
+  <nav class="session-nav" aria-label="Maps">
+    <a class="btn-link btn-secondary" routerLink="/maps">Back to maps</a>
+  </nav>
+</header>
+
+@if (loading()) {
+  <p class="session-badge map-view-back">Loading map…</p>
+} @else if (loadError()) {
+  <main class="map-fallback">
+    <div class="map-fallback__card">
+      <h1>Map unavailable</h1>
+      <p>{{ loadError() }}</p>
+      <a class="btn-link" routerLink="/maps">Back to maps</a>
+    </div>
+  </main>
+} @else if (map(); as current) {
+  <h1 class="map-view-title">{{ current.name }}</h1>
+  <main class="map-stage">
+    @if (!imageFailed()) {
+      <!-- Every overlay is a sibling of the gesture surface, so a click on a
+           control never counts as a map gesture and never steals a form's focus. -->
+      <div class="map-shell">
+        <div
+          #frame
+          class="map-frame"
+          tabindex="0"
+          role="group"
+          aria-label="Map. Zoom with plus and minus, pan with the arrow keys, reset with zero."
+          (pointerdown)="onPointerDown($event)"
+          (pointermove)="onPointerMove($event)"
+          (pointerup)="onPointerUp($event)"
+          (pointercancel)="onPointerCancel($event)"
+          (wheel)="onWheel($event)"
+          (keydown)="onKeyDown($event)"
+        >
+          <!-- One composited transform moves the image and every annotation together. -->
+          <div class="map-pan" [style.transform]="zoom.transform()">
+            <div
+              class="map-media"
+              [style.width.px]="fittedSize()?.width"
+              [style.height.px]="fittedSize()?.height"
+            >
+              <img
+                #mapImage
+                class="map-image"
+                [src]="current.image_url"
+                [alt]="current.name"
+                draggable="false"
+                (error)="onImageError()"
+                (load)="onImageLoad($any($event.target))"
+              />
+              <app-annotation-layer
+                [annotations]="annotations()"
+                [imageWidth]="fittedSize()?.width ?? 0"
+                [scale]="zoom.scale()"
+                [preview]="preview()"
+                [openPopupId]="openPopupId()"
+                [editingId]="draft()?.id ?? null"
+                (activate)="onAnnotationActivate($event)"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="map-zoom" role="group" aria-label="Zoom controls">
+          <button
+            type="button"
+            class="map-zoom__btn"
+            aria-label="Zoom in"
+            [disabled]="!zoom.canZoomIn()"
+            (click)="zoom.zoomIn()"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            class="map-zoom__btn"
+            aria-label="Zoom out"
+            [disabled]="!zoom.canZoomOut()"
+            (click)="zoom.zoomOut()"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            class="map-zoom__btn map-zoom__btn--reset"
+            aria-label="Reset view"
+            [disabled]="!zoom.zoomed()"
+            (click)="zoom.reset()"
+          >
+            Reset
+          </button>
+        </div>
+
+        <!-- Outside the transformed wrapper, so the toggles stay in the corner at
+             every zoom level and pan position (FR-010). -->
+        @if (authenticated()) {
+          <div class="map-toggles" role="group" aria-label="Add annotations">
+            <button
+              type="button"
+              class="map-toggle map-toggle--label"
+              aria-label="Place a text label"
+              [attr.aria-pressed]="placementMode() === 'label'"
+              (click)="togglePlacement('label')"
+            >
+              Label
+            </button>
+            <button
+              type="button"
+              class="map-toggle map-toggle--poi"
+              aria-label="Place a point of interest"
+              [attr.aria-pressed]="placementMode() === 'poi'"
+              (click)="togglePlacement('poi')"
+            >
+              Point
+            </button>
+          </div>
+
+          @if (awaitingMove()) {
+            <p class="map-hint" role="status">Click the map to move this annotation.</p>
+          } @else if (placementMode() !== 'off' && !draft()) {
+            <p class="map-hint" role="status">
+              @if (placementMode() === 'label') {
+                Click the map to place a label.
+              } @else {
+                Click the map to place a point of interest.
+              }
+            </p>
+          }
+        }
+
+        <!-- Hidden while the map is waiting for the new spot, so the form never
+             covers the place the author is aiming at. -->
+        @if (draft(); as editing) {
+          @if (!awaitingMove()) {
+            <div
+              class="annotation-editor-anchor"
+              [style.left.px]="draftAnchor()?.x"
+              [style.top.px]="draftAnchor()?.y"
+            >
+              <app-annotation-editor
+                [draft]="editing"
+                (draftChange)="onDraftChange($event)"
+                [targets]="targets()"
+                [saving]="saving()"
+                [serverError]="saveError()"
+                (save)="onDraftSave($event)"
+                (cancel)="onDraftCancel()"
+                (imageRemove)="onDraftImageRemove($event)"
+                (move)="onDraftMove()"
+                (remove)="onDraftDelete()"
+              />
+            </div>
+          }
+        }
+
+        <!-- Outside the transform, so its text stays legible at every zoom
+             level rather than being scaled with the map (research Decision 4). -->
+        @if (openPopup(); as point) {
+          <div
+            class="poi-popup-anchor"
+            [style.left.px]="popupAnchor()?.x"
+            [style.top.px]="popupAnchor()?.y"
+          >
+            <app-poi-popup [annotation]="point" (dismiss)="dismissPopup()" />
+          </div>
+        }
+
+        @if (notice()) {
+          <div class="map-notice" role="status">
+            <p>{{ notice() }}</p>
+            @if (sessionExpired()) {
+              <a class="btn-link" routerLink="/login">Sign in</a>
+            }
+            <button type="button" class="btn btn-secondary" (click)="dismissNotice()">
+              Dismiss
+            </button>
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="map-fallback">
+        <div class="map-fallback__card">
+          <h1>Image unavailable</h1>
+          <p>This map's image couldn't be loaded right now. Please try again later.</p>
+        </div>
+      </div>
+    }
+  </main>
+}

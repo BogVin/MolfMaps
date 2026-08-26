@@ -1,6 +1,7 @@
 <header class="site-header">
   <span class="brand">MolfMaps</span>
   <nav class="session-nav" aria-label="Session">
+    <a class="btn-link btn-secondary" routerLink="/maps">Maps</a>
     @if (sessionError()) {
       <span class="session-error" role="status">{{ sessionError() }}</span>
     }

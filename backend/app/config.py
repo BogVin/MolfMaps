@@ -18,6 +18,34 @@ SESSION_MAX_AGE: int = 8 * 60 * 60
 # Name of the signed session cookie.
 SESSION_COOKIE_NAME: str = "session"
 
+# Accepted map image formats, detected by sniffing the file's leading bytes.
+# The client-declared Content-Type and filename are never trusted; the stored
+# extension always comes from this table (research Decision 4).
+ALLOWED_IMAGE_TYPES: dict[str, str] = {
+    "image/webp": "webp",
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/gif": "gif",
+}
+
+# Annotation bounds, centralised so the models, the server-side clamping, and the
+# frontend slider all reference one source (data-model.md -> Shared constants).
+#
+# A text link's `text_scale` is its font size as a fraction of the map image's
+# width, which is what keeps a label proportional to the map at every zoom level
+# (FR-027). Out-of-range values are clamped to the nearest bound rather than
+# refused, because FR-024 describes the size stopping at its limit.
+MIN_TEXT_SCALE: float = 0.01
+MAX_TEXT_SCALE: float = 0.10
+DEFAULT_TEXT_SCALE: float = 0.03
+
+MAX_LABEL_TEXT_LENGTH: int = 120
+MAX_POI_TEXT_LENGTH: int = 2000
+
+# Default catalog store, resolved relative to the `backend/` package root so the
+# app behaves the same regardless of the working directory it is launched from.
+_DEFAULT_MAPS_DATA_DIR: Path = Path(__file__).resolve().parent.parent / "data"
+
 # Tests set MOLFMAPS_DISABLE_DOTENV=1 so a developer's local backend/.env cannot
 # leak real configuration into the test environment.
 _ENV_FILE: str | Path | None = (
@@ -36,6 +64,15 @@ class Settings(BaseSettings):
 
     # Cookie `Secure` flag — enable in production (HTTPS).
     session_cookie_secure: bool = False
+
+    # Map catalog store — both have working defaults so a fresh clone runs
+    # unconfigured (data-model.md → New configuration).
+    maps_data_dir: Path = _DEFAULT_MAPS_DATA_DIR
+    max_map_image_bytes: int = 10 * 1024 * 1024
+
+    # Upper bound on images attached to one point of interest — the spec assumes
+    # a small handful rather than an unlimited gallery.
+    max_poi_images: int = 5
 
     model_config = SettingsConfigDict(
         env_file=_ENV_FILE,

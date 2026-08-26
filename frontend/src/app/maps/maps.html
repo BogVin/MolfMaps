@@ -1,0 +1,110 @@
+<header class="site-header site-header--solid">
+  <a class="brand" routerLink="/">MolfMaps</a>
+  <nav class="session-nav" aria-label="Session">
+    @if (authenticated()) {
+      <span class="session-badge">Logged in</span>
+    } @else {
+      <a class="btn-link" routerLink="/login">Login</a>
+    }
+  </nav>
+</header>
+
+<main class="maps-page">
+  <h1>Maps</h1>
+
+  @if (sessionNotice()) {
+    <p class="form-error" role="alert">
+      {{ sessionNotice() }} <a class="maps-list__link" routerLink="/login">Log in</a>
+    </p>
+  }
+
+  @if (authenticated()) {
+    <form class="add-map-card" #addForm (ngSubmit)="addMap(addForm)" novalidate>
+      <h2>Add a map</h2>
+
+      @if (addError()) {
+        <p class="form-error" role="alert">{{ addError() }}</p>
+      }
+      @if (addSuccess()) {
+        <p class="form-success" role="status">{{ addSuccess() }}</p>
+      }
+
+      <div class="field">
+        <label for="map-name">Display name</label>
+        <input
+          id="map-name"
+          name="mapName"
+          type="text"
+          maxlength="100"
+          [(ngModel)]="newMapName"
+        />
+      </div>
+
+      <div class="field">
+        <label for="map-image">Image file</label>
+        <input
+          id="map-image"
+          name="mapImage"
+          type="file"
+          accept="image/webp,image/png,image/jpeg,image/gif"
+          ngModel
+          (change)="onFileSelected($event)"
+        />
+      </div>
+
+      <button class="btn" type="submit" [disabled]="adding()">
+        {{ adding() ? 'Adding…' : 'Add map' }}
+      </button>
+    </form>
+  }
+
+  @if (loading()) {
+    <p class="session-badge">Loading maps…</p>
+  } @else if (loadError()) {
+    <p class="form-error" role="alert">{{ loadError() }}</p>
+    <button class="btn btn-secondary" type="button" (click)="loadMaps()">Try again</button>
+  } @else if (maps().length === 0) {
+    <p class="maps-empty">No maps available yet.</p>
+  } @else {
+    @if (deleteError()) {
+      <p class="form-error" role="alert">{{ deleteError() }}</p>
+    }
+    <ul class="maps-list">
+      @for (map of maps(); track map.id) {
+        <li class="maps-list__row">
+          <a class="maps-list__link" [routerLink]="['/maps', map.id]">{{ map.name }}</a>
+          @if (authenticated()) {
+            <span class="maps-list__actions">
+              @if (pendingDeleteId() === map.id) {
+                <span class="confirm-prompt">Delete permanently?</span>
+                <button
+                  class="btn btn-small btn-danger"
+                  type="button"
+                  (click)="confirmDelete(map.id)"
+                >
+                  Confirm
+                </button>
+                <button
+                  class="btn btn-small btn-secondary"
+                  type="button"
+                  (click)="cancelDelete()"
+                >
+                  Cancel
+                </button>
+              } @else {
+                <button
+                  class="btn btn-small btn-danger maps-list__delete"
+                  type="button"
+                  [attr.aria-label]="'Delete ' + map.name"
+                  (click)="askDelete(map.id)"
+                >
+                  Delete
+                </button>
+              }
+            </span>
+          }
+        </li>
+      }
+    </ul>
+  }
+</main>

@@ -15,8 +15,9 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 
+from . import catalog
 from .config import get_settings
-from .routes import assets, auth
+from .routes import annotations, assets, auth, maps
 
 logger = logging.getLogger("molfmaps")
 
@@ -39,6 +40,7 @@ async def lifespan(_app: FastAPI):
             "(ADMIN_USERNAME / ADMIN_PASSWORD / SESSION_SECRET). "
             "All login attempts will be refused until they are set in backend/.env."
         )
+    catalog.ensure_seeded()
     yield
 
 
@@ -46,6 +48,8 @@ app = FastAPI(title="MolfMaps API", version="0.1.0", lifespan=lifespan)
 
 app.include_router(assets.router)
 app.include_router(auth.router)
+app.include_router(maps.router)
+app.include_router(annotations.router)
 
 
 # Optional single-origin mode: serve the Angular production build at `/` so

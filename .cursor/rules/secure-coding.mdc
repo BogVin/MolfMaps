@@ -1,0 +1,181 @@
+---
+description: Security principles and secure coding practices
+alwaysApply: true
+---
+
+# Secure Coding Principles
+
+## Core Principle
+
+**Never trust user input. Validate at boundaries. Fail securely.**
+
+Security is a shared responsibility between application code, infrastructure, and operations. This guide focuses on what developers control at the code level.
+
+> **Note:** Many security controls (HTTPS, rate limiting, authentication middleware, security headers) may be handled at the infrastructure or framework level in your project. Check your project's setup before adding redundant controls.
+
+> For concrete secure coding examples in your framework, see your stack's rules.
+
+## Input Validation
+
+**All external input is untrusted** — whether from users, APIs, files, or databases.
+
+Validate all inputs at system boundaries using your framework's validation library. Always validate server-side, even if the frontend already validated. Sanitize inputs where appropriate (e.g., trimming whitespace, normalizing case). Frontend validation improves UX but provides no security.
+
+### Validation Principles
+
+- **Validate early** — At the boundary before processing
+- **Validate type, length, format, range** — Be specific
+- **Allowlist over blocklist** — Define what's valid, not what's invalid
+- **Fail closed** — Reject anything that doesn't pass validation
+
+## Injection Prevention
+
+### SQL Injection
+
+**Always use parameterized queries.**
+
+```sql
+-- WRONG: "SELECT * FROM users WHERE id = " + userId
+-- RIGHT: Use parameterized queries with your framework's data access layer
+```
+
+ORMs and query builders typically handle parameterization automatically. If writing raw SQL, never concatenate user input into query strings.
+
+### Command Injection
+
+Never pass user input directly to system commands or shell invocations. If you must execute external processes, use strict allowlists for permitted values and avoid shell interpretation of user-supplied strings.
+
+### XSS Prevention
+
+Modern frameworks auto-escape by default. Be careful when bypassing:
+
+```
+// ✅ Safe: use your framework's default output encoding (React, Angular, Razor, etc.)
+// Frameworks escape content by default — trust the default rendering path.
+
+// ❌ Dangerous: bypassing framework output encoding (e.g., innerHTML, v-html, dangerouslySetInnerHTML)
+// Always use your framework's default safe rendering — avoid raw HTML injection
+```
+
+## Authentication & Authorization
+
+### Principles
+
+1. **Authentication** — Verify identity (who are you?)
+2. **Authorization** — Verify permissions (what can you do?)
+
+These may be handled at different levels:
+- **Global filters/middleware** — Project-wide authentication
+- **Per-endpoint checks** — Fine-grained authorization
+
+### Authorization Checks
+
+Always verify server-side that the authenticated user is permitted to access the requested resource. Common patterns include:
+
+- **Owner check** — Users can only access their own data
+- **Role check** — Certain actions require specific roles (e.g., Admin)
+- **Permission check** — Fine-grained permissions per resource and action
+
+Never rely solely on client-side checks or hidden UI elements for access control.
+
+## Secrets Management
+
+**Never hardcode secrets.** API keys, connection strings, and credentials must come from configuration or environment, not source code.
+
+### Where Secrets Should Live
+
+| Environment | Storage |
+|-------------|---------|
+| Local dev | User secrets, `.env` files (gitignored) |
+| CI/CD | Pipeline variables, secrets store |
+| Production | Secrets manager (Vault, AWS Secrets Manager, K8s secrets) |
+
+### Never Commit Secrets
+
+Ensure `.gitignore` excludes `.env` files, local settings overrides, and secrets directories.
+
+## Logging & Error Handling
+
+### Structured Logging Without PII
+
+Log identifiers and status codes, not content or credentials. Never log passwords, tokens, API keys, or full request/response bodies. Use structured logging with correlation IDs for traceability.
+
+### Sensitive Data Categories
+
+- Passwords, tokens, API keys
+- PII (emails, names, addresses, phone numbers)
+- Financial data (card numbers, account numbers)
+- Health information
+- Full request/response bodies
+
+### Error Messages
+
+Log detailed error information server-side for debugging, but return only generic error messages to clients. Never expose stack traces, database errors, or internal details in API responses.
+
+### Audit Trail
+
+Log security-relevant events for monitoring: failed login attempts, permission denials, password changes, and admin actions on other users.
+
+## Data Protection
+
+### Passwords
+
+**Never store plaintext passwords.** Always use a purpose-built password hashing algorithm (bcrypt, Argon2, or scrypt). Never use general-purpose hashes (MD5, SHA-256) for passwords.
+
+### Data at Rest and in Transit
+
+Consider encryption for personal data in databases, sensitive files, and backups. Ensure all external communication uses HTTPS, database connections are encrypted, and inter-service communication is secured.
+
+## Dependency Security
+
+### Keep Dependencies Updated
+
+Use your package manager's audit tools (e.g., `dotnet list package --vulnerable`, `npm audit`) to check for known vulnerabilities regularly.
+
+### Minimize Dependencies
+
+- Fewer dependencies = smaller attack surface
+- Prefer well-maintained, widely-used packages
+- Review what you're adding before adding it
+
+## Security Mindset Checklist
+
+When writing code, ask yourself:
+
+### Input
+- [ ] Is all input validated before use?
+- [ ] Am I using parameterized queries?
+- [ ] Am I encoding output appropriately?
+
+### Access
+- [ ] Is authorization verified for this action?
+- [ ] Can users only access their own data?
+- [ ] Are admin functions properly protected?
+
+### Secrets
+- [ ] Are there any hardcoded secrets?
+- [ ] Is sensitive data excluded from logs?
+- [ ] Are error messages safe to expose?
+
+### Dependencies
+- [ ] Are dependencies up to date?
+- [ ] Any known vulnerabilities?
+
+## Common Vulnerabilities Quick Reference
+
+| Vulnerability | Prevention |
+|---------------|------------|
+| **SQL Injection** | Parameterized queries, ORMs |
+| **XSS** | Output encoding (frameworks do this) |
+| **CSRF** | Anti-forgery tokens (if applicable) |
+| **Path Traversal** | Validate file paths, use allowlists |
+| **SSRF** | Allowlist external URLs |
+| **Insecure Deserialization** | Validate types, use safe serializers |
+| **Broken Access Control** | Check authorization on every request |
+| **Sensitive Data Exposure** | Encrypt, don't log, minimize collection |
+
+---
+
+**See Also:**
+- `core/agents/security-analyst.md` — Security analysis agent
+- `core/rules/clean-architecture.mdc` — Separation of concerns

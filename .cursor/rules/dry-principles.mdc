@@ -1,0 +1,54 @@
+---
+description: Core DRY (Don't Repeat Yourself) principles and refactoring strategies
+alwaysApply: true
+---
+
+# DRY Development Principles
+
+## Core Principles
+
+### 1. Extract Common Code into Utilities
+When identical logic (e.g., email normalization, input sanitization) is repeated across handlers or services, extract it into a shared utility. All callers reference the single utility instead of duplicating the logic inline.
+
+### 2. Use Composition Over Inheritance
+Extract shared behavior into composable units rather than duplicating across base classes or components. Each consumer delegates to the shared unit rather than reimplementing the pattern.
+
+Signs you need composition: multiple classes share identical state shapes, loading/error handling, or lifecycle patterns.
+
+### 3. Extract Constants and Configuration
+Centralize all domain constants in a single constants file or configuration class. All validators and services reference these shared constants rather than embedding raw values.
+
+### 4. Create Reusable Validators
+Consolidate validation into dedicated validator classes or schemas. Handlers invoke the validator and handle the result. This also centralizes error messages across all entry points.
+
+### 5. Use Domain Models to Encapsulate Logic
+When multiple services compute the same result, move that logic into the domain model itself. The entity owns its behavior; services simply call the model's method.
+
+### 6. Use Criteria Objects for Queries
+Instead of separate methods for each filter combination, define a criteria object that captures query parameters. A single repository method accepts the criteria and builds the query dynamically.
+
+
+## When to Extract
+
+**Extract when:**
+- Logic is duplicated 3+ times (or 2+ with high complexity)
+- A change requires updates in multiple places
+- Testing requires repeated identical setup
+
+**Don't over-extract:**
+- Single-use helpers add unnecessary indirection
+- Superficially similar code serving different domains is coincidental duplication, not a DRY violation
+- Premature abstraction before the real pattern emerges
+
+## Red Flags
+
+- Same logic in >2 places
+- Copy-paste during coding
+- "Just modified 5 files for one change"
+- Constants hardcoded in multiple places
+- Validation logic scattered throughout
+- Similar error handling in many places
+
+---
+
+**See Also:** core/rules/clean-architecture.mdc

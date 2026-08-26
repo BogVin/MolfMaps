@@ -1,0 +1,108 @@
+---
+description: Autonomous multi-agent workflow orchestration guide
+alwaysApply: true
+---
+
+# Autonomous Workflow System
+
+## Overview
+
+This plugin provides a multi-agent system for autonomous feature development. Each agent specializes in a phase of the development lifecycle and can be invoked individually or orchestrated end-to-end.
+
+## Available Agents & Skills
+
+| Agent | Model | Purpose | Invocation |
+|-------|-------|---------|------------|
+| **planner** | Thinking | Architecture, planning, task breakdown | `@planner` or `Use the planner to...` |
+| **developer** | Fast | Code implementation | `@developer` or `Use the developer to...` |
+| **unit-tester** | Default | Unit test generation | `@unit-tester` or `Use the unit tester to...` |
+| **playwright-tester** | Default | E2E test generation | `@playwright-tester` or `Use the playwright tester to...` |
+| **playwright-reviewer** | Thinking | E2E test quality review | `@playwright-reviewer` or `Use the playwright reviewer to...` |
+| **code-reviewer** | Thinking | Code quality review | `@code-reviewer` or `Use the code reviewer to...` |
+| **security-analyst** | Default | Security vulnerability audit | `@security-analyst` or `Use the security analyst to...` |
+| **test-iterator** | Default | Autonomous test run/fix/retry | `@test-iterator` or `Use the test iterator to...` |
+| **orchestrator** | Thinking | Full workflow coordination | `@orchestrator` or `Run the orchestrator to...` |
+
+## Workflow Order
+
+```
+Planning → [user approval] → Development → Unit Testing → E2E Testing → E2E Review → Test Iteration → Code Review → Security Analysis
+```
+
+The orchestrator halts after planning and waits for the user to explicitly approve the plan before development starts. This approval gate is mandatory and is never skipped, even for autonomous runs.
+
+Not all phases are required. Skip phases that don't apply:
+
+- **Skip E2E tests**: Simple utilities, internal-only features, backend-only changes
+- **Skip playwright-review**: When E2E tests are skipped
+- **Test Iteration**: Default-on. Opt out at orchestrator invocation, or auto-skip when E2E phases were skipped
+- **Skip security analysis**: Minor refactors, test-only changes
+- **Full workflow**: Critical user-facing features, auth flows, new API endpoints
+
+## Individual Agent Commands
+
+### Planning
+```
+Use the planner to create an implementation plan for [feature description]
+```
+
+### Development
+```
+Use the developer to implement [specific task from plan]
+```
+
+### Testing
+```
+Use the unit tester to create tests for [source file or component]
+Use the playwright tester to create E2E tests for [user flow]
+Use the playwright reviewer to review E2E tests for [feature]
+Use the test iterator to run and fix tests for [feature]
+```
+
+### Review
+```
+Use the code reviewer to review [files or feature]
+Use the security analyst to audit [component or feature]
+```
+
+### Full Workflow
+```
+Run the orchestrator to implement [complete feature description]
+```
+
+## Quality Gates
+
+Each phase has a quality gate before proceeding:
+
+| Phase | Gate |
+|-------|------|
+| Planning | Tasks are atomic (1-3 files), dependencies identified |
+| Plan Approval | User explicitly approved the plan before development begins |
+| Development | Code compiles, no errors, error handling complete |
+| Unit Testing | Tests pass, coverage ≥80% for critical paths |
+| E2E Testing | Tests pass, cleanup verified, patterns followed |
+| Code Review | No critical issues, patterns compliant |
+| Security | No critical vulnerabilities, auth correct |
+
+## Context Handoff
+
+Between phases, track:
+
+- Files created/modified
+- Key behaviors implemented
+- Pattern references used
+- Outstanding issues or risks
+
+## Model Selection Strategy
+
+- **Thinking models** — Deep reasoning: planning, code review, orchestration, E2E review
+- **Fast models** — Quick iterations: development, implementation
+- **Default models** — Balanced: testing, security analysis
+
+## Tips
+
+1. **Be specific** — "Implement user role assignment" not "Add RBAC"
+2. **Include context** — Current implementation, constraints, performance needs
+3. **Single feature** — One complete feature per orchestrator run
+4. **Review outputs** — Understand each phase's work before proceeding
+5. **Trust the process** — Even small features benefit from planning

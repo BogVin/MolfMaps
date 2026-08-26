@@ -1,0 +1,116 @@
+---
+description: Clean Architecture principles - layering, separation of concerns, dependency management
+alwaysApply: true
+---
+
+# Clean Architecture
+
+## Overview
+
+Clean Architecture emphasizes:
+- **Separation of concerns** — Each layer has one responsibility
+- **Dependency flow** — Dependencies point inward (toward business logic)
+- **Testability** — Easy to test each layer independently
+- **Independence** — Business logic independent of UI/DB/frameworks
+
+## Layering Model
+
+The exact project structure varies by team, but the principle remains: **dependencies point inward**.
+
+```
+┌───────────────────────────────────────┐
+│      PRESENTATION (API/Controllers)   │  (HTTP, UI, routing)
+├───────────────────────────────────────┤
+│      SERVICES (Business Logic)        │  (Use cases, validation, entities)
+├───────────────────────────────────────┤
+│      INFRASTRUCTURE (Repositories)    │  (Data access, external services)
+└───────────────────────────────────────┘
+
+Dependencies flow INWARD ↓
+- Controllers depend on Services
+- Services define interfaces (contracts)
+- Infrastructure implements those interfaces
+- Business logic is independent of infrastructure
+```
+
+> **Note:** Some teams have a separate Domain project; others include entities in Services. Both are valid — the key is that business logic doesn't depend on infrastructure details.
+
+## Layer Responsibilities
+
+### 1. Business Logic Layer (Services)
+
+**Responsibility:** Business rules, use cases, domain logic
+
+**Contains:**
+- Entities/Models (User, Order, etc.)
+- Handlers or service classes
+- Validators
+- Interfaces (contracts for repositories)
+- Domain exceptions
+
+**Must NOT:**
+- Know about HTTP specifics (status codes, headers)
+- Directly reference database (DbContext, connection strings)
+- Depend on external service implementation details
+
+### 2. Presentation Layer (API/Controllers)
+
+**Responsibility:** HTTP concerns, routing, serialization
+
+**Contains:**
+- Controllers
+- Middleware
+- Filters
+- Request/Response mapping
+
+**Must NOT:**
+- Contain business logic
+- Directly access database
+- Make business decisions
+
+### 3. Infrastructure Layer (Repository)
+
+**Responsibility:** Data access, external service integrations
+
+**Contains:**
+- Repository implementations
+- Database context/connections
+- External API clients
+- Caching implementations
+
+**Must:**
+- Implement interfaces defined by Services
+- Handle data mapping between database and domain models
+- Be replaceable (swap for in-memory for testing)
+
+> For concrete implementation examples in your framework, see your stack's architecture rule (e.g., `dotnet-backend/rules/dotnet-architecture.mdc` for .NET, `react-frontend/rules/react-component-patterns.mdc` for React).
+
+## Common Violations to Avoid
+
+- **Business logic in controllers.** Controllers must not contain business logic or database access. They should delegate to services or handlers and map results to HTTP responses.
+
+- **Services depending on infrastructure details.** Service classes and handlers must depend on interfaces (e.g., a repository interface), never on concrete infrastructure types like a database context, ORM session, or connection object. The infrastructure layer implements those interfaces.
+
+- **Skipping the service layer.** Even for simple CRUD operations, route requests through a service or handler. This keeps the architecture consistent and ensures business rules have a single home when complexity grows.
+
+- **Infrastructure leaking into the domain.** Domain models should not carry persistence annotations, serialization attributes, or framework-specific base classes. Keep them plain objects that represent business concepts.
+
+## Key Benefits
+
+| Benefit | Example |
+|---------|---------|
+| **Testability** | Swap real repository for mock in tests |
+| **Flexibility** | Change database without touching business logic |
+| **Clarity** | Easy to find where each concern is handled |
+| **Maintainability** | Changes in one layer don't cascade |
+
+## Testing Benefits
+
+Clean Architecture makes testing straightforward because each layer can be tested in isolation. Business logic tests mock the repository interfaces, so they run fast and never touch a real database. Presentation layer tests verify routing and response mapping without invoking real business logic. Infrastructure tests confirm data access works correctly against a test database or in-memory store. This separation means a failing test immediately tells you which layer has the problem.
+
+---
+
+**See Also:**
+- `dotnet-backend/rules/dotnet-architecture.mdc` — .NET-specific patterns
+- `dotnet-cqrs/rules/mediatr-cqrs.mdc` — CQRS handler patterns
+- `dotnet-services/rules/service-pattern.mdc` — Traditional service patterns
