@@ -3,7 +3,19 @@ import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
 import { ApiService } from '../core/api.service';
-import { MapSummary, TextLinkAnnotation } from '../core/api.types';
+import {
+  MapSummary,
+  RegionLinkAnnotation,
+  TextLinkAnnotation,
+} from '../core/api.types';
+import {
+  DEFAULT_HOVER_APPEARANCE,
+  DEFAULT_REGION_HEIGHT,
+  DEFAULT_REGION_WIDTH,
+  DEFAULT_REST_APPEARANCE,
+  DEFAULT_TEXT_COLOR,
+  DEFAULT_TYPEFACE,
+} from './annotation-constants';
 import { MapView } from './map-view';
 
 const MAP: MapSummary = {
@@ -24,6 +36,24 @@ const SAVED_LINK: TextLinkAnnotation = {
   text: 'North District',
   target_map_id: MAP.id,
   text_scale: 0.03,
+  color: DEFAULT_TEXT_COLOR,
+  typeface: DEFAULT_TYPEFACE,
+  target_available: true,
+  created_at: '2026-07-31T12:00:00+00:00',
+  updated_at: '2026-07-31T12:00:00+00:00',
+};
+
+const SAVED_REGION: RegionLinkAnnotation = {
+  id: 'c'.repeat(32),
+  map_id: MAP.id,
+  kind: 'region_link',
+  x: 0.42,
+  y: 0.45,
+  width: DEFAULT_REGION_WIDTH,
+  height: DEFAULT_REGION_HEIGHT,
+  rest: { ...DEFAULT_REST_APPEARANCE },
+  hover: { ...DEFAULT_HOVER_APPEARANCE },
+  target_map_id: MAP.id,
   target_available: true,
   created_at: '2026-07-31T12:00:00+00:00',
   updated_at: '2026-07-31T12:00:00+00:00',
@@ -51,7 +81,10 @@ function createComponent(
   return fixture;
 }
 
-function toggle(fixture: ComponentFixture<MapView>, kind: 'label' | 'poi'): HTMLButtonElement {
+function toggle(
+  fixture: ComponentFixture<MapView>,
+  kind: 'label' | 'poi' | 'region',
+): HTMLButtonElement {
   const found = fixture.nativeElement.querySelector(`.map-toggle--${kind}`);
   if (!found) {
     throw new Error(`No ${kind} placement toggle rendered`);
@@ -141,18 +174,19 @@ function editorOpen(fixture: ComponentFixture<MapView>): boolean {
 }
 
 describe('MapView placement toggles', () => {
-  it('hides both toggles for an unauthenticated visitor', () => {
+  it('hides all toggles for an unauthenticated visitor', () => {
     const fixture = createComponent(false);
 
     expect(fixture.nativeElement.querySelectorAll('.map-toggle').length).toBe(0);
   });
 
-  it('renders both toggles switched off for an authenticated user', () => {
+  it('renders all toggles switched off for an authenticated user', () => {
     const fixture = createComponent(true);
 
-    expect(fixture.nativeElement.querySelectorAll('.map-toggle').length).toBe(2);
+    expect(fixture.nativeElement.querySelectorAll('.map-toggle').length).toBe(3);
     expect(pressed(toggle(fixture, 'label'))).toBe(false);
     expect(pressed(toggle(fixture, 'poi'))).toBe(false);
+    expect(pressed(toggle(fixture, 'region'))).toBe(false);
   });
 
   it('starts every fresh view with placement mode off', () => {
@@ -177,6 +211,15 @@ describe('MapView placement toggles', () => {
     expect(fixture.componentInstance.placementMode()).toBe('poi');
     expect(pressed(toggle(fixture, 'label'))).toBe(false);
     expect(pressed(toggle(fixture, 'poi'))).toBe(true);
+    expect(pressed(toggle(fixture, 'region'))).toBe(false);
+
+    toggle(fixture, 'region').click();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.placementMode()).toBe('region');
+    expect(pressed(toggle(fixture, 'label'))).toBe(false);
+    expect(pressed(toggle(fixture, 'poi'))).toBe(false);
+    expect(pressed(toggle(fixture, 'region'))).toBe(true);
   });
 
   it('returns to plain viewing when the armed toggle is switched off', () => {
@@ -261,6 +304,8 @@ describe('MapView label placement', () => {
       text: 'North District',
       target_map_id: MAP.id,
       text_scale: 0.03,
+      color: DEFAULT_TEXT_COLOR,
+      typeface: DEFAULT_TYPEFACE,
     });
     expect(editorOpen(fixture)).toBe(false);
     expect(query(fixture, '.annotation-label').textContent?.trim()).toBe('North District');
@@ -297,6 +342,76 @@ describe('MapView label placement', () => {
       MAP.id,
       expect.objectContaining({ text_scale: 0.08 }),
     );
+  });
+
+  it('previews and saves the chosen color and typeface', async () => {
+    const createAnnotation = vi.fn(() => of(SAVED_LINK));
+    const fixture = armed({ createAnnotation } as unknown as Partial<ApiService>);
+    tapMap(fixture, 100, 50);
+    await fillEditor(fixture, 'North District');
+
+    const color = query<HTMLInputElement>(fixture, '#annotation-color');
+    color.value = '#123456';
+    color.dispatchEvent(new Event('input'));
+    const typeface = query<HTMLSelectElement>(fixture, '#annotation-typeface');
+    typeface.value = 'serif';
+    typeface.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    expect(query<HTMLElement>(fixture, '.annotation-label--preview').style.color).toBe(
+      'rgb(18, 52, 86)',
+    );
+    expect(query<HTMLElement>(fixture, '.annotation-label--preview').style.fontFamily).toContain(
+      'Georgia',
+    );
+    submitEditor(fixture);
+    expect(createAnnotation).toHaveBeenCalledWith(
+      MAP.id,
+      expect.objectContaining({ color: '#123456', typeface: 'serif' }),
+    );
+  });
+});
+
+describe('MapView region placement', () => {
+  function armed(overrides: Partial<ApiService> = {}): ComponentFixture<MapView> {
+    const fixture = createComponent(true, overrides);
+    stubImageBox(fixture);
+    toggle(fixture, 'region').click();
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('plants a default region centred at the clicked point', () => {
+    const fixture = armed();
+
+    tapMap(fixture, 100, 50);
+
+    expect(fixture.componentInstance.draft()).toMatchObject({
+      kind: 'region_link',
+      x: 0.5 - DEFAULT_REGION_WIDTH / 2,
+      y: 0.5 - DEFAULT_REGION_HEIGHT / 2,
+      width: DEFAULT_REGION_WIDTH,
+      height: DEFAULT_REGION_HEIGHT,
+    });
+  });
+
+  it('pans instead of planting on drag', () => {
+    const fixture = armed();
+
+    dragMap(fixture, [40, 40], [140, 90]);
+
+    expect(fixture.componentInstance.draft()).toBeNull();
+  });
+
+  it('requires a target before saving', () => {
+    const createAnnotation = vi.fn(() => of(SAVED_REGION));
+    const fixture = armed({ createAnnotation } as unknown as Partial<ApiService>);
+    tapMap(fixture, 100, 50);
+
+    submitEditor(fixture);
+
+    expect(createAnnotation).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain('Choose the map this region opens.');
   });
 });
 

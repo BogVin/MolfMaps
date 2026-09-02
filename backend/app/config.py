@@ -38,6 +38,29 @@ ALLOWED_IMAGE_TYPES: dict[str, str] = {
 MIN_TEXT_SCALE: float = 0.01
 MAX_TEXT_SCALE: float = 0.10
 DEFAULT_TEXT_SCALE: float = 0.03
+DEFAULT_TEXT_COLOR: str = "#f5f7fa"
+DEFAULT_TYPEFACE: str = "sans"
+TYPEFACES: tuple[str, ...] = ("sans", "serif", "condensed")
+COLOR_PATTERN: str = r"^#[0-9a-f]{6}$"
+
+MIN_REGION_SIZE: float = 0.04
+MAX_REGION_SIZE: float = 1.0
+DEFAULT_REGION_WIDTH: float = 0.16
+DEFAULT_REGION_HEIGHT: float = 0.10
+MIN_OPACITY: float = 0.0
+MAX_OPACITY: float = 1.0
+MIN_BRIGHTNESS: float = 0.25
+MAX_BRIGHTNESS: float = 2.0
+DEFAULT_REST_APPEARANCE: dict[str, float | str] = {
+    "color": "#4f9dff",
+    "opacity": 0.0,
+    "brightness": 1.0,
+}
+DEFAULT_HOVER_APPEARANCE: dict[str, float | str] = {
+    "color": "#4f9dff",
+    "opacity": 0.4,
+    "brightness": 1.0,
+}
 
 MAX_LABEL_TEXT_LENGTH: int = 120
 MAX_POI_TEXT_LENGTH: int = 2000

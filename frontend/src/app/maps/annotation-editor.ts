@@ -15,13 +15,33 @@
 import { Component, computed, input, model, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { Annotation, MapSummary, PoiImage } from '../core/api.types';
-
-/** Bounds mirroring the server's, so the slider cannot leave the saved range. */
-export const MIN_TEXT_SCALE = 0.01;
-export const MAX_TEXT_SCALE = 0.1;
-export const DEFAULT_TEXT_SCALE = 0.03;
-export const TEXT_SCALE_STEP = 0.005;
+import {
+  Annotation,
+  MapSummary,
+  PoiImage,
+  RegionAppearance,
+} from '../core/api.types';
+import {
+  DEFAULT_HOVER_APPEARANCE,
+  DEFAULT_REGION_HEIGHT,
+  DEFAULT_REGION_WIDTH,
+  DEFAULT_REST_APPEARANCE,
+  DEFAULT_TEXT_COLOR,
+  DEFAULT_TEXT_SCALE,
+  DEFAULT_TYPEFACE,
+  MAX_BRIGHTNESS,
+  MAX_OPACITY,
+  MAX_REGION_SIZE,
+  MAX_TEXT_SCALE,
+  MIN_BRIGHTNESS,
+  MIN_OPACITY,
+  MIN_REGION_SIZE,
+  MIN_TEXT_SCALE,
+  TEXT_SCALE_STEP,
+  TYPEFACES,
+  Typeface,
+} from './annotation-constants';
+import { clampRegionGeometry } from './region-geometry';
 
 export const MAX_LABEL_TEXT_LENGTH = 120;
 export const MAX_POI_TEXT_LENGTH = 2000;
@@ -29,13 +49,20 @@ export const MAX_POI_TEXT_LENGTH = 2000;
 export interface AnnotationDraft {
   /** Present only when correcting an annotation that is already saved. */
   id?: string;
-  kind: 'text_link' | 'poi';
+  kind: 'text_link' | 'poi' | 'region_link';
   /** Position as fractions of the map image, supplied by the click. */
   x: number;
   y: number;
   text: string;
   targetMapId: string;
   textScale: number;
+  color: string;
+  typeface: Typeface;
+  width: number;
+  height: number;
+  rest: RegionAppearance;
+  hover: RegionAppearance;
+  previewHover: boolean;
   /** Images already stored on this annotation. */
   images: PoiImage[];
   /** Files chosen here, uploaded once the annotation itself is saved. */
@@ -54,6 +81,13 @@ export function createDraft(
     text: '',
     targetMapId: '',
     textScale: DEFAULT_TEXT_SCALE,
+    color: DEFAULT_TEXT_COLOR,
+    typeface: DEFAULT_TYPEFACE,
+    width: DEFAULT_REGION_WIDTH,
+    height: DEFAULT_REGION_HEIGHT,
+    rest: { ...DEFAULT_REST_APPEARANCE },
+    hover: { ...DEFAULT_HOVER_APPEARANCE },
+    previewHover: false,
     images: [],
     pendingImages: [],
   };
@@ -65,7 +99,7 @@ export function draftFrom(annotation: Annotation): AnnotationDraft {
     id: annotation.id,
     x: annotation.x,
     y: annotation.y,
-    text: annotation.text,
+    text: annotation.kind === 'region_link' ? '' : annotation.text,
     pendingImages: [],
   };
   if (annotation.kind === 'text_link') {
@@ -74,6 +108,29 @@ export function draftFrom(annotation: Annotation): AnnotationDraft {
       kind: 'text_link',
       targetMapId: annotation.target_map_id,
       textScale: annotation.text_scale,
+      color: annotation.color,
+      typeface: annotation.typeface,
+      width: DEFAULT_REGION_WIDTH,
+      height: DEFAULT_REGION_HEIGHT,
+      rest: { ...DEFAULT_REST_APPEARANCE },
+      hover: { ...DEFAULT_HOVER_APPEARANCE },
+      previewHover: false,
+      images: [],
+    };
+  }
+  if (annotation.kind === 'region_link') {
+    return {
+      ...common,
+      kind: 'region_link',
+      targetMapId: annotation.target_map_id,
+      textScale: DEFAULT_TEXT_SCALE,
+      color: DEFAULT_TEXT_COLOR,
+      typeface: DEFAULT_TYPEFACE,
+      width: annotation.width,
+      height: annotation.height,
+      rest: { ...annotation.rest },
+      hover: { ...annotation.hover },
+      previewHover: false,
       images: [],
     };
   }
@@ -82,6 +139,13 @@ export function draftFrom(annotation: Annotation): AnnotationDraft {
     kind: 'poi',
     targetMapId: '',
     textScale: DEFAULT_TEXT_SCALE,
+    color: DEFAULT_TEXT_COLOR,
+    typeface: DEFAULT_TYPEFACE,
+    width: DEFAULT_REGION_WIDTH,
+    height: DEFAULT_REGION_HEIGHT,
+    rest: { ...DEFAULT_REST_APPEARANCE },
+    hover: { ...DEFAULT_HOVER_APPEARANCE },
+    previewHover: false,
     images: annotation.images,
   };
 }
@@ -115,8 +179,17 @@ export class AnnotationEditor {
   readonly minTextScale = MIN_TEXT_SCALE;
   readonly maxTextScale = MAX_TEXT_SCALE;
   readonly textScaleStep = TEXT_SCALE_STEP;
+  readonly typefaces = TYPEFACES;
+  readonly minRegionSize = MIN_REGION_SIZE;
+  readonly maxRegionSize = MAX_REGION_SIZE;
+  readonly minOpacity = MIN_OPACITY;
+  readonly maxOpacity = MAX_OPACITY;
+  readonly minBrightness = MIN_BRIGHTNESS;
+  readonly maxBrightness = MAX_BRIGHTNESS;
 
   readonly isTextLink = computed(() => this.draft().kind === 'text_link');
+  readonly isRegion = computed(() => this.draft().kind === 'region_link');
+  readonly isPoi = computed(() => this.draft().kind === 'poi');
 
   readonly isEditing = computed(() => Boolean(this.draft().id));
 
@@ -134,6 +207,9 @@ export class AnnotationEditor {
     if (this.isTextLink()) {
       return this.isEditing() ? 'Edit this label' : 'Add a text label';
     }
+    if (this.isRegion()) {
+      return this.isEditing() ? 'Edit this region link' : 'Add a region link';
+    }
     return this.isEditing() ? 'Edit this point of interest' : 'Add a point of interest';
   });
 
@@ -141,15 +217,15 @@ export class AnnotationEditor {
   private readonly submitted = signal(false);
 
   readonly textError = computed(() => {
-    if (!this.submitted() || this.draft().text.trim()) {
+    if (this.isRegion() || !this.submitted() || this.draft().text.trim()) {
       return '';
     }
     return this.isTextLink() ? 'Enter the label text.' : 'Enter a description.';
   });
 
   readonly targetError = computed(() =>
-    this.submitted() && this.isTextLink() && !this.draft().targetMapId
-      ? 'Choose the map this label opens.'
+    this.submitted() && !this.isPoi() && !this.draft().targetMapId
+      ? `Choose the map this ${this.isRegion() ? 'region' : 'label'} opens.`
       : '',
   );
 
@@ -164,6 +240,41 @@ export class AnnotationEditor {
   onTextScaleChange(value: string): void {
     const textScale = clampTextScale(Number(value));
     this.draft.update((draft) => ({ ...draft, textScale }));
+  }
+
+  onColorChange(color: string): void {
+    this.draft.update((draft) => ({ ...draft, color }));
+  }
+
+  onTypefaceChange(typeface: Typeface): void {
+    this.draft.update((draft) => ({ ...draft, typeface }));
+  }
+
+  onRegionSizeChange(field: 'width' | 'height', value: string): void {
+    this.draft.update((draft) => ({
+      ...draft,
+      ...clampRegionGeometry({ ...draft, [field]: Number(value) }),
+    }));
+  }
+
+  onAppearanceChange(
+    state: 'rest' | 'hover',
+    field: keyof RegionAppearance,
+    value: string,
+  ): void {
+    const numeric = field === 'color' ? value : Number(value);
+    this.draft.update((draft) => ({
+      ...draft,
+      [state]: { ...draft[state], [field]: numeric },
+    }));
+  }
+
+  appearance(state: string): RegionAppearance {
+    return state === 'rest' ? this.draft().rest : this.draft().hover;
+  }
+
+  onPreviewHover(previewHover: boolean): void {
+    this.draft.update((draft) => ({ ...draft, previewHover }));
   }
 
   onFilesChosen(input: HTMLInputElement): void {

@@ -1,3 +1,24 @@
+@for (region of regions(); track region.id) {
+  <button
+    type="button"
+    class="annotation-region"
+    [class.annotation-region--authoring]="authoring()"
+    [style.left.%]="region.x * 100"
+    [style.top.%]="region.y * 100"
+    [style.width.%]="region.width * 100"
+    [style.height.%]="region.height * 100"
+    [style.--region-rest-color]="region.rest.color"
+    [style.--region-rest-opacity]="region.rest.opacity"
+    [style.--region-rest-brightness]="region.rest.brightness"
+    [style.--region-hover-color]="region.hover.color"
+    [style.--region-hover-opacity]="region.hover.opacity"
+    [style.--region-hover-brightness]="region.hover.brightness"
+    [attr.aria-label]="describeRegion(region)"
+    (pointerdown)="onPointerDown($event)"
+    (click)="onActivate($event, region)"
+  ></button>
+}
+
 @for (link of textLinks(); track link.id) {
   <button
     type="button"
@@ -6,6 +27,8 @@
     [style.left.%]="link.x * 100"
     [style.top.%]="link.y * 100"
     [style.font-size.px]="fontSize(link.text_scale)"
+    [style.color]="link.color"
+    [style.font-family]="fontFamily(link.typeface)"
     [attr.aria-label]="describe(link)"
     (pointerdown)="onPointerDown($event)"
     (click)="onActivate($event, link)"
@@ -37,7 +60,27 @@
     [style.left.%]="draft.x * 100"
     [style.top.%]="draft.y * 100"
     [style.font-size.px]="fontSize(draft.textScale)"
+    [style.color]="draft.color"
+    [style.font-family]="fontFamily(draft.typeface)"
   >
     {{ draft.text || 'Label' }}
   </span>
+}
+
+@if (regionPreview(); as draft) {
+  <span
+    class="annotation-region annotation-region--authoring annotation-region--preview"
+    [class.annotation-region--preview-hover]="draft.previewHover"
+    aria-hidden="true"
+    [style.left.%]="draft.x * 100"
+    [style.top.%]="draft.y * 100"
+    [style.width.%]="draft.width * 100"
+    [style.height.%]="draft.height * 100"
+    [style.--region-rest-color]="draft.rest.color"
+    [style.--region-rest-opacity]="draft.rest.opacity"
+    [style.--region-rest-brightness]="draft.rest.brightness"
+    [style.--region-hover-color]="draft.hover.color"
+    [style.--region-hover-opacity]="draft.hover.opacity"
+    [style.--region-hover-brightness]="draft.hover.brightness"
+  ></span>
 }

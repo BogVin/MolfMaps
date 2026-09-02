@@ -11,7 +11,14 @@
 
 import { Component, computed, input, output } from '@angular/core';
 
-import { Annotation, PoiAnnotation, TextLinkAnnotation } from '../core/api.types';
+import {
+  Annotation,
+  PoiAnnotation,
+  RegionAppearance,
+  RegionLinkAnnotation,
+  TextLinkAnnotation,
+} from '../core/api.types';
+import { typefaceStack } from './typeface';
 
 /** Enough of a marker's text to identify it without reading out a whole popup. */
 const MARKER_LABEL_LENGTH = 60;
@@ -22,6 +29,18 @@ export interface LabelPreview {
   y: number;
   text: string;
   textScale: number;
+  color: string;
+  typeface: string;
+}
+
+export interface RegionPreview {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rest: RegionAppearance;
+  hover: RegionAppearance;
+  previewHover: boolean;
 }
 
 @Component({
@@ -39,6 +58,8 @@ export class AnnotationLayer {
   readonly scale = input(1);
 
   readonly preview = input<LabelPreview | null>(null);
+  readonly regionPreview = input<RegionPreview | null>(null);
+  readonly authoring = input(false);
 
   /** The marker whose popup is open, so it can be shown as the active one. */
   readonly openPopupId = input<string | null>(null);
@@ -61,9 +82,20 @@ export class AnnotationLayer {
     ),
   );
 
+  readonly regions = computed(() =>
+    this.annotations().filter(
+      (annotation): annotation is RegionLinkAnnotation =>
+        annotation.kind === 'region_link' && annotation.id !== this.editingId(),
+    ),
+  );
+
   /** Map-relative sizing is what keeps a label proportional at every zoom (FR-027). */
   fontSize(textScale: number): number {
     return textScale * this.imageWidth();
+  }
+
+  fontFamily(typeface: string): string {
+    return typefaceStack(typeface);
   }
 
   /**
@@ -87,6 +119,12 @@ export class AnnotationLayer {
         ? `${point.text.slice(0, MARKER_LABEL_LENGTH)}…`
         : point.text;
     return `Point of interest: ${summary}`;
+  }
+
+  describeRegion(region: RegionLinkAnnotation): string {
+    return region.target_available
+      ? 'Open the linked map'
+      : 'Linked map is no longer available';
   }
 
   onActivate(event: Event, annotation: Annotation): void {

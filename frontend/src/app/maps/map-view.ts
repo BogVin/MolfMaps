@@ -29,8 +29,9 @@ import {
   createDraft,
   draftFrom,
 } from './annotation-editor';
-import { AnnotationLayer, LabelPreview } from './annotation-layer';
+import { AnnotationLayer, LabelPreview, RegionPreview } from './annotation-layer';
 import { PoiPopup } from './poi-popup';
+import { clampRegionGeometry, defaultRegionAt } from './region-geometry';
 import { FrameSize, ZoomPan } from './zoom-pan';
 
 const NOT_FOUND = 'This map is no longer available.';
@@ -58,7 +59,7 @@ const PLACEMENT_TIME_LIMIT = 500;
  * Exactly one of three states, so "only one placement mode at a time" cannot be
  * violated by any code path (research Decision 10).
  */
-export type PlacementMode = 'off' | 'label' | 'poi';
+export type PlacementMode = 'off' | 'label' | 'poi' | 'region';
 
 interface GestureStart {
   x: number;
@@ -137,7 +138,30 @@ export class MapView implements OnInit {
     if (!draft || draft.kind !== 'text_link') {
       return null;
     }
-    return { x: draft.x, y: draft.y, text: draft.text, textScale: draft.textScale };
+    return {
+      x: draft.x,
+      y: draft.y,
+      text: draft.text,
+      textScale: draft.textScale,
+      color: draft.color,
+      typeface: draft.typeface,
+    };
+  });
+
+  readonly regionPreview = computed<RegionPreview | null>(() => {
+    const draft = this.draft();
+    if (!draft || draft.kind !== 'region_link') {
+      return null;
+    }
+    return {
+      x: draft.x,
+      y: draft.y,
+      width: draft.width,
+      height: draft.height,
+      rest: draft.rest,
+      hover: draft.hover,
+      previewHover: draft.previewHover,
+    };
   });
 
   /** Where to anchor the editor: the clicked map point, in frame coordinates. */
@@ -404,6 +428,11 @@ export class MapView implements OnInit {
       return;
     }
     this.saveError.set('');
+    if (mode === 'region') {
+      const geometry = defaultRegionAt(point.x, point.y);
+      this.draft.set({ ...createDraft('region_link', geometry.x, geometry.y), ...geometry });
+      return;
+    }
     this.draft.set(createDraft(mode === 'label' ? 'text_link' : 'poi', point.x, point.y));
   }
 
@@ -413,7 +442,20 @@ export class MapView implements OnInit {
       return;
     }
     // The new spot is only staged; it reaches the server with the next save.
-    this.draft.update((draft) => (draft ? { ...draft, x: point.x, y: point.y } : draft));
+    this.draft.update((draft) => {
+      if (!draft) {
+        return draft;
+      }
+      if (draft.kind !== 'region_link') {
+        return { ...draft, x: point.x, y: point.y };
+      }
+      const geometry = clampRegionGeometry({
+        ...draft,
+        x: point.x - draft.width / 2,
+        y: point.y - draft.height / 2,
+      });
+      return { ...draft, ...geometry };
+    });
     this.awaitingMove.set(false);
   }
 
@@ -697,6 +739,18 @@ function createBody(draft: AnnotationDraft): CreateAnnotationRequest {
   if (draft.kind === 'poi') {
     return { kind: 'poi', x: draft.x, y: draft.y, text: draft.text };
   }
+  if (draft.kind === 'region_link') {
+    return {
+      kind: 'region_link',
+      x: draft.x,
+      y: draft.y,
+      target_map_id: draft.targetMapId,
+      width: draft.width,
+      height: draft.height,
+      rest: draft.rest,
+      hover: draft.hover,
+    };
+  }
   return {
     kind: 'text_link',
     x: draft.x,
@@ -704,6 +758,8 @@ function createBody(draft: AnnotationDraft): CreateAnnotationRequest {
     text: draft.text,
     target_map_id: draft.targetMapId,
     text_scale: draft.textScale,
+    color: draft.color,
+    typeface: draft.typeface,
   };
 }
 
@@ -712,11 +768,21 @@ function updateBody(draft: AnnotationDraft): UpdateAnnotationRequest {
   const changes: UpdateAnnotationRequest = {
     x: draft.x,
     y: draft.y,
-    text: draft.text,
   };
   if (draft.kind === 'text_link') {
+    changes.text = draft.text;
     changes.target_map_id = draft.targetMapId;
     changes.text_scale = draft.textScale;
+    changes.color = draft.color;
+    changes.typeface = draft.typeface;
+  } else if (draft.kind === 'region_link') {
+    changes.target_map_id = draft.targetMapId;
+    changes.width = draft.width;
+    changes.height = draft.height;
+    changes.rest = draft.rest;
+    changes.hover = draft.hover;
+  } else {
+    changes.text = draft.text;
   }
   return changes;
 }

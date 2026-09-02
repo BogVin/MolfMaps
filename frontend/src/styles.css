@@ -267,6 +267,35 @@ app-map-view {
   outline: 1px dashed var(--accent);
 }
 
+.annotation-region {
+  position: absolute;
+  padding: 0;
+  pointer-events: auto;
+  border: 0;
+  background: var(--region-rest-color);
+  opacity: var(--region-rest-opacity);
+  filter: brightness(var(--region-rest-brightness));
+  cursor: pointer;
+}
+
+.annotation-region:hover,
+.annotation-region:focus-visible,
+.annotation-region:active,
+.annotation-region--preview-hover {
+  background: var(--region-hover-color);
+  opacity: var(--region-hover-opacity);
+  filter: brightness(var(--region-hover-brightness));
+}
+
+.annotation-region--authoring {
+  outline: 1px dashed var(--accent);
+  opacity: max(var(--region-rest-opacity), 0.12);
+}
+
+.annotation-region--preview {
+  pointer-events: none;
+}
+
 /* Markers are counter-scaled inline, so this is their constant on-screen size
    at every zoom level (research Decision 4). */
 .annotation-marker {
@@ -453,6 +482,24 @@ app-map-view {
   font-size: 0.8rem;
 }
 
+.annotation-editor__appearance {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+}
+
+.annotation-editor__appearance label,
+.annotation-editor__preview-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .annotation-editor__actions {
   display: flex;
   gap: 0.5rem;
@@ -546,7 +593,8 @@ app-map-view {
   color: var(--muted);
 }
 
-.field input {
+.field input,
+.field select {
   padding: 0.6rem 0.75rem;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -555,7 +603,8 @@ app-map-view {
   font-size: 1rem;
 }
 
-.field input:focus {
+.field input:focus,
+.field select:focus {
   outline: none;
   border-color: var(--accent);
 }

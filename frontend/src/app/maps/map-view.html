@@ -56,6 +56,8 @@
                 [imageWidth]="fittedSize()?.width ?? 0"
                 [scale]="zoom.scale()"
                 [preview]="preview()"
+                [regionPreview]="regionPreview()"
+                [authoring]="authenticated()"
                 [openPopupId]="openPopupId()"
                 [editingId]="draft()?.id ?? null"
                 (activate)="onAnnotationActivate($event)"
@@ -116,6 +118,15 @@
             >
               Point
             </button>
+            <button
+              type="button"
+              class="map-toggle map-toggle--region"
+              aria-label="Place a region link"
+              [attr.aria-pressed]="placementMode() === 'region'"
+              (click)="togglePlacement('region')"
+            >
+              Region
+            </button>
           </div>
 
           @if (awaitingMove()) {
@@ -124,8 +135,10 @@
             <p class="map-hint" role="status">
               @if (placementMode() === 'label') {
                 Click the map to place a label.
-              } @else {
+              } @else if (placementMode() === 'poi') {
                 Click the map to place a point of interest.
+              } @else {
+                Click the map to place a region link.
               }
             </p>
           }

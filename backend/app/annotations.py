@@ -18,10 +18,18 @@ from typing import Any, BinaryIO
 
 from . import catalog, storage
 from .config import (
+    DEFAULT_HOVER_APPEARANCE,
+    DEFAULT_REGION_HEIGHT,
+    DEFAULT_REGION_WIDTH,
+    DEFAULT_REST_APPEARANCE,
+    DEFAULT_TEXT_COLOR,
     DEFAULT_TEXT_SCALE,
+    DEFAULT_TYPEFACE,
     MAX_LABEL_TEXT_LENGTH,
     MAX_POI_TEXT_LENGTH,
+    MAX_REGION_SIZE,
     MAX_TEXT_SCALE,
+    MIN_REGION_SIZE,
     MIN_TEXT_SCALE,
     get_settings,
 )
@@ -31,7 +39,9 @@ Record = dict[str, Any]
 
 # Fields only a text link carries; supplying one for a point of interest is a
 # client bug rather than a no-op, so it is refused.
-_TEXT_LINK_ONLY_FIELDS = frozenset({"target_map_id", "text_scale"})
+_TEXT_LINK_ONLY_FIELDS = frozenset({"text_scale", "color", "typeface"})
+_LINK_ONLY_FIELDS = frozenset({"target_map_id"})
+_REGION_ONLY_FIELDS = frozenset({"width", "height", "rest", "hover"})
 
 
 class AnnotationNotFoundError(Exception):
@@ -100,6 +110,23 @@ def _clamp_text_scale(value: float | None) -> float:
     return min(max(value, MIN_TEXT_SCALE), MAX_TEXT_SCALE)
 
 
+def _fit_region(
+    x: float, y: float, width: float | None, height: float | None
+) -> tuple[float, float, float, float]:
+    """Clamp region size and shift it fully onto the normalized image."""
+    width = min(max(width or DEFAULT_REGION_WIDTH, MIN_REGION_SIZE), MAX_REGION_SIZE)
+    height = min(max(height or DEFAULT_REGION_HEIGHT, MIN_REGION_SIZE), MAX_REGION_SIZE)
+    x = min(max(x, 0.0), 1.0 - width)
+    y = min(max(y, 0.0), 1.0 - height)
+    return x, y, width, height
+
+
+def _appearance(value: Any, default: dict[str, float | str]) -> Record:
+    if value is None:
+        return dict(default)
+    return value.model_dump() if hasattr(value, "model_dump") else dict(value)
+
+
 def list_annotations(map_id: str) -> list[Record]:
     """A map's annotations, oldest first, so render order is stable across reloads."""
     return sorted(_load(map_id), key=lambda record: record["created_at"])
@@ -127,17 +154,37 @@ def create_annotation(map_id: str, payload: AnnotationCreateRequest) -> Record:
         "kind": payload.kind,
         "x": payload.x,
         "y": payload.y,
-        "text": payload.text,
         "created_at": now,
         "updated_at": now,
     }
     if payload.kind == "text_link":
         if catalog.get_map(payload.target_map_id) is None:
             raise UnknownTargetMapError
+        record["text"] = payload.text
         record["target_map_id"] = payload.target_map_id
         record["text_scale"] = _clamp_text_scale(payload.text_scale)
-    else:
+        record["color"] = payload.color or DEFAULT_TEXT_COLOR
+        record["typeface"] = payload.typeface or DEFAULT_TYPEFACE
+    elif payload.kind == "poi":
+        record["text"] = payload.text
         record["images"] = []
+    else:
+        if catalog.get_map(payload.target_map_id) is None:
+            raise UnknownTargetMapError
+        x, y, width, height = _fit_region(
+            payload.x, payload.y, payload.width, payload.height
+        )
+        record.update(
+            {
+                "x": x,
+                "y": y,
+                "target_map_id": payload.target_map_id,
+                "width": width,
+                "height": height,
+                "rest": _appearance(payload.rest, DEFAULT_REST_APPEARANCE),
+                "hover": _appearance(payload.hover, DEFAULT_HOVER_APPEARANCE),
+            }
+        )
 
     with storage.write_lock:
         _save(map_id, [*_load(map_id), record])
@@ -146,10 +193,16 @@ def create_annotation(map_id: str, payload: AnnotationCreateRequest) -> Record:
 
 def _validate_changes(record: Record, changes: Record) -> None:
     """Refuse a change before anything is written (data-model.md -> Lifecycle)."""
-    if record["kind"] != "text_link" and _TEXT_LINK_ONLY_FIELDS & changes.keys():
-        raise InvalidUpdateError(
-            "A point of interest has no target map or text size."
-        )
+    kind = record["kind"]
+    keys = changes.keys()
+    if kind != "text_link" and _TEXT_LINK_ONLY_FIELDS & keys:
+        raise InvalidUpdateError("This annotation has no text styling.")
+    if kind != "region_link" and _REGION_ONLY_FIELDS & keys:
+        raise InvalidUpdateError("Only a region link has region geometry or appearance.")
+    if kind == "poi" and _LINK_ONLY_FIELDS & keys:
+        raise InvalidUpdateError("A point of interest has no target map.")
+    if kind == "region_link" and "text" in keys:
+        raise InvalidUpdateError("A region link has no text.")
     if "text" in changes:
         limit = (
             MAX_LABEL_TEXT_LENGTH
@@ -184,6 +237,19 @@ def update_annotation(
         if record is None:
             raise AnnotationNotFoundError
         _validate_changes(record, supplied)
+        if record["kind"] == "region_link" and {
+            "x",
+            "y",
+            "width",
+            "height",
+        } & supplied.keys():
+            x, y, width, height = _fit_region(
+                supplied.get("x", record["x"]),
+                supplied.get("y", record["y"]),
+                supplied.get("width", record["width"]),
+                supplied.get("height", record["height"]),
+            )
+            supplied.update({"x": x, "y": y, "width": width, "height": height})
         record.update(supplied)
         record["updated_at"] = storage.utc_now_iso()
         _save(map_id, records)

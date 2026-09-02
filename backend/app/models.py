@@ -7,9 +7,16 @@ from typing import Annotated, Literal, Union
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .config import (
+    COLOR_PATTERN,
+    MAX_BRIGHTNESS,
     MAX_LABEL_TEXT_LENGTH,
+    MAX_OPACITY,
     MAX_POI_TEXT_LENGTH,
+    MAX_REGION_SIZE,
     MAX_TEXT_SCALE,
+    MIN_BRIGHTNESS,
+    MIN_OPACITY,
+    MIN_REGION_SIZE,
     MIN_TEXT_SCALE,
 )
 
@@ -91,6 +98,8 @@ class TextLinkAnnotation(AnnotationBase):
     text: str = Field(min_length=1, max_length=MAX_LABEL_TEXT_LENGTH)
     target_map_id: str
     text_scale: float = Field(ge=MIN_TEXT_SCALE, le=MAX_TEXT_SCALE)
+    color: str = Field(pattern=COLOR_PATTERN)
+    typeface: Literal["sans", "serif", "condensed"]
     # Computed at read time, never stored: whether the target still exists, so
     # the UI can mark a stale link without a lookup per label (FR-030).
     target_available: bool
@@ -113,8 +122,45 @@ class PoiAnnotation(AnnotationBase):
     images: list[PoiImage]
 
 
+class RegionAppearance(BaseModel):
+    """A region fill in either its resting or interactive state."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    color: str = Field(pattern=COLOR_PATTERN)
+    opacity: float = Field(ge=MIN_OPACITY, le=MAX_OPACITY)
+    brightness: float = Field(ge=MIN_BRIGHTNESS, le=MAX_BRIGHTNESS)
+
+    @field_validator("opacity", mode="before")
+    @classmethod
+    def _clamp_opacity(cls, value: object) -> object:
+        if isinstance(value, (int, float)):
+            return min(max(float(value), MIN_OPACITY), MAX_OPACITY)
+        return value
+
+    @field_validator("brightness", mode="before")
+    @classmethod
+    def _clamp_brightness(cls, value: object) -> object:
+        if isinstance(value, (int, float)):
+            return min(max(float(value), MIN_BRIGHTNESS), MAX_BRIGHTNESS)
+        return value
+
+
+class RegionLinkAnnotation(AnnotationBase):
+    """An axis-aligned, map-relative hotspot linking to another map."""
+
+    kind: Literal["region_link"]
+    target_map_id: str
+    width: float = Field(ge=MIN_REGION_SIZE, le=MAX_REGION_SIZE)
+    height: float = Field(ge=MIN_REGION_SIZE, le=MAX_REGION_SIZE)
+    rest: RegionAppearance
+    hover: RegionAppearance
+    target_available: bool
+
+
 Annotation = Annotated[
-    Union[TextLinkAnnotation, PoiAnnotation], Field(discriminator="kind")
+    Union[TextLinkAnnotation, PoiAnnotation, RegionLinkAnnotation],
+    Field(discriminator="kind"),
 ]
 
 
@@ -151,6 +197,8 @@ class CreateTextLinkRequest(_AnnotationRequest):
     # bound rather than refused, because FR-024 describes the size stopping at
     # its limit. Omitted means DEFAULT_TEXT_SCALE (FR-025).
     text_scale: float | None = None
+    color: str | None = Field(default=None, pattern=COLOR_PATTERN)
+    typeface: Literal["sans", "serif", "condensed"] | None = None
 
 
 class CreatePoiRequest(_AnnotationRequest):
@@ -162,8 +210,22 @@ class CreatePoiRequest(_AnnotationRequest):
     text: str = Field(min_length=1, max_length=MAX_POI_TEXT_LENGTH)
 
 
+class CreateRegionLinkRequest(_AnnotationRequest):
+    """Payload for creating a rectangular map hotspot."""
+
+    kind: Literal["region_link"]
+    x: Fraction
+    y: Fraction
+    target_map_id: str
+    width: float | None = None
+    height: float | None = None
+    rest: RegionAppearance | None = None
+    hover: RegionAppearance | None = None
+
+
 AnnotationCreateRequest = Annotated[
-    Union[CreateTextLinkRequest, CreatePoiRequest], Field(discriminator="kind")
+    Union[CreateTextLinkRequest, CreatePoiRequest, CreateRegionLinkRequest],
+    Field(discriminator="kind"),
 ]
 
 
@@ -182,3 +244,9 @@ class AnnotationUpdateRequest(_AnnotationRequest):
     text: str | None = Field(default=None, min_length=1, max_length=MAX_POI_TEXT_LENGTH)
     target_map_id: str | None = None
     text_scale: float | None = None
+    color: str | None = Field(default=None, pattern=COLOR_PATTERN)
+    typeface: Literal["sans", "serif", "condensed"] | None = None
+    width: float | None = None
+    height: float | None = None
+    rest: RegionAppearance | None = None
+    hover: RegionAppearance | None = None

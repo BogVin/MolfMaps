@@ -1,19 +1,20 @@
 <form class="annotation-editor" (ngSubmit)="onSubmit()">
   <h2 class="annotation-editor__title">{{ title() }}</h2>
 
-  <div class="field">
-    <label for="annotation-text">{{ isTextLink() ? 'Label text' : 'Description' }}</label>
-    @if (isTextLink()) {
-      <input
-        id="annotation-text"
-        name="text"
-        type="text"
-        autocomplete="off"
-        [maxlength]="maxTextLength()"
-        [ngModel]="draft().text"
-        (ngModelChange)="onTextChange($event)"
-      />
-    } @else {
+  @if (!isRegion()) {
+    <div class="field">
+      <label for="annotation-text">{{ isTextLink() ? 'Label text' : 'Description' }}</label>
+      @if (isTextLink()) {
+        <input
+          id="annotation-text"
+          name="text"
+          type="text"
+          autocomplete="off"
+          [maxlength]="maxTextLength()"
+          [ngModel]="draft().text"
+          (ngModelChange)="onTextChange($event)"
+        />
+      } @else {
       <textarea
         id="annotation-text"
         name="text"
@@ -22,13 +23,14 @@
         [ngModel]="draft().text"
         (ngModelChange)="onTextChange($event)"
       ></textarea>
-    }
-    @if (textError()) {
-      <p class="form-error">{{ textError() }}</p>
-    }
-  </div>
+      }
+      @if (textError()) {
+        <p class="form-error">{{ textError() }}</p>
+      }
+    </div>
+  }
 
-  @if (isTextLink()) {
+  @if (!isPoi()) {
     <div class="field">
       <label for="annotation-target">Opens this map</label>
       <select
@@ -47,6 +49,9 @@
       }
     </div>
 
+  }
+
+  @if (isTextLink()) {
     <div class="field">
       <label for="annotation-size">Text size</label>
       <!-- Bound to the saved range, so pushing past either end stops at the limit. -->
@@ -64,7 +69,111 @@
         The label previews on the map at this size before you save.
       </p>
     </div>
-  } @else {
+
+    <div class="field">
+      <label for="annotation-color">Text color</label>
+      <input
+        id="annotation-color"
+        name="color"
+        type="color"
+        [ngModel]="draft().color"
+        (ngModelChange)="onColorChange($event)"
+      />
+    </div>
+
+    <div class="field">
+      <label for="annotation-typeface">Typeface</label>
+      <select
+        id="annotation-typeface"
+        name="typeface"
+        [ngModel]="draft().typeface"
+        (ngModelChange)="onTypefaceChange($event)"
+      >
+        @for (typeface of typefaces; track typeface) {
+          <option [value]="typeface">{{ typeface }}</option>
+        }
+      </select>
+    </div>
+  }
+
+  @if (isRegion()) {
+    <div class="field">
+      <label for="annotation-width">Region width</label>
+      <input
+        id="annotation-width"
+        name="width"
+        type="range"
+        [min]="minRegionSize"
+        [max]="maxRegionSize"
+        step="0.01"
+        [ngModel]="draft().width"
+        (ngModelChange)="onRegionSizeChange('width', $event)"
+      />
+    </div>
+    <div class="field">
+      <label for="annotation-height">Region height</label>
+      <input
+        id="annotation-height"
+        name="height"
+        type="range"
+        [min]="minRegionSize"
+        [max]="maxRegionSize"
+        step="0.01"
+        [ngModel]="draft().height"
+        (ngModelChange)="onRegionSizeChange('height', $event)"
+      />
+    </div>
+
+    @for (state of ['rest', 'hover']; track state) {
+      <fieldset class="annotation-editor__appearance">
+        <legend>{{ state === 'rest' ? 'Rest appearance' : 'Hover appearance' }}</legend>
+        <label>
+          Color
+          <input
+            [name]="state + '-color'"
+            type="color"
+            [ngModel]="appearance(state).color"
+            (ngModelChange)="onAppearanceChange($any(state), 'color', $event)"
+          />
+        </label>
+        <label>
+          Opacity
+          <input
+            [name]="state + '-opacity'"
+            type="range"
+            [min]="minOpacity"
+            [max]="maxOpacity"
+            step="0.05"
+            [ngModel]="appearance(state).opacity"
+            (ngModelChange)="onAppearanceChange($any(state), 'opacity', $event)"
+          />
+        </label>
+        <label>
+          Brightness
+          <input
+            [name]="state + '-brightness'"
+            type="range"
+            [min]="minBrightness"
+            [max]="maxBrightness"
+            step="0.05"
+            [ngModel]="appearance(state).brightness"
+            (ngModelChange)="onAppearanceChange($any(state), 'brightness', $event)"
+          />
+        </label>
+      </fieldset>
+    }
+    <label class="annotation-editor__preview-toggle">
+      <input
+        name="preview-hover"
+        type="checkbox"
+        [ngModel]="draft().previewHover"
+        (ngModelChange)="onPreviewHover($event)"
+      />
+      Preview hover appearance
+    </label>
+  }
+
+  @if (isPoi()) {
     <div class="field">
       <label for="annotation-images">Images</label>
       <ul class="annotation-editor__images">

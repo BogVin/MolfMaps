@@ -11,7 +11,18 @@ from __future__ import annotations
 from typing import Any
 
 from app import annotations
-from app.config import DEFAULT_TEXT_SCALE, MAX_TEXT_SCALE, MIN_TEXT_SCALE
+from app.config import (
+    DEFAULT_REGION_HEIGHT,
+    DEFAULT_REGION_WIDTH,
+    DEFAULT_TEXT_COLOR,
+    DEFAULT_TEXT_SCALE,
+    DEFAULT_TYPEFACE,
+    MAX_BRIGHTNESS,
+    MAX_TEXT_SCALE,
+    MIN_OPACITY,
+    MIN_REGION_SIZE,
+    MIN_TEXT_SCALE,
+)
 
 UNKNOWN_ID = "0" * 32
 
@@ -56,6 +67,17 @@ def _poi(**overrides: Any) -> dict[str, Any]:
         "x": 0.3,
         "y": 0.7,
         "text": "The old lighthouse.",
+    }
+    payload.update(overrides)
+    return payload
+
+
+def _region(target_map_id: str, **overrides: Any) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "kind": "region_link",
+        "x": 0.5,
+        "y": 0.5,
+        "target_map_id": target_map_id,
     }
     payload.update(overrides)
     return payload
@@ -623,3 +645,179 @@ def test_link_to_a_deleted_target_map_survives_as_unavailable(admin_client, make
     listed = _listed(admin_client, source, created["id"])
     assert listed["target_available"] is False
     assert listed["target_map_id"] == target
+
+
+# --- Text styling and region links (feature 005) -----------------------------
+
+
+def test_text_style_defaults_and_explicit_values_round_trip(admin_client, make_map):
+    source = make_map(admin_client, "Source")
+    target = make_map(admin_client, "Target")
+
+    defaulted = admin_client.post(_annotations_url(source), json=_text_link(target))
+    styled = admin_client.post(
+        _annotations_url(source),
+        json=_text_link(target, color="#112233", typeface="serif"),
+    )
+
+    assert defaulted.status_code == 201
+    assert defaulted.json()["color"] == DEFAULT_TEXT_COLOR
+    assert defaulted.json()["typeface"] == DEFAULT_TYPEFACE
+    assert styled.status_code == 201
+    assert styled.json()["color"] == "#112233"
+    assert styled.json()["typeface"] == "serif"
+
+
+def test_invalid_text_style_is_refused_without_a_write(admin_client, make_map):
+    source = make_map(admin_client, "Source")
+    target = make_map(admin_client, "Target")
+
+    invalid_color = admin_client.post(
+        _annotations_url(source), json=_text_link(target, color="red")
+    )
+    invalid_typeface = admin_client.post(
+        _annotations_url(source), json=_text_link(target, typeface="comic")
+    )
+
+    assert invalid_color.status_code == 422
+    assert invalid_typeface.status_code == 422
+    assert _sidecar_bytes(source) == b""
+
+
+def test_patch_text_style_is_partial_and_wrong_kind_is_refused(admin_client, make_map):
+    source = make_map(admin_client, "Source")
+    target = make_map(admin_client, "Target")
+    link = admin_client.post(
+        _annotations_url(source),
+        json=_text_link(target, color="#111111", typeface="condensed"),
+    ).json()
+    poi_id = _create_poi(admin_client, source)
+
+    updated = admin_client.patch(
+        _annotation_url(source, link["id"]), json={"color": "#abcdef"}
+    )
+    refused = admin_client.patch(
+        _annotation_url(source, poi_id), json={"color": "#abcdef"}
+    )
+
+    assert updated.status_code == 200
+    assert updated.json()["color"] == "#abcdef"
+    assert updated.json()["typeface"] == "condensed"
+    assert refused.status_code == 422
+
+
+def test_legacy_text_style_defaults_are_projected_without_rewriting(
+    admin_client, make_map
+):
+    source = make_map(admin_client, "Source")
+    target = make_map(admin_client, "Target")
+    record = {
+        "id": "1" * 32,
+        "kind": "text_link",
+        "x": 0.2,
+        "y": 0.3,
+        "text": "Legacy",
+        "target_map_id": target,
+        "text_scale": 0.07,
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00",
+    }
+    annotations._save(source, [record])
+    before = _sidecar_bytes(source)
+
+    listed = _listed(admin_client, source, record["id"])
+
+    assert listed["color"] == DEFAULT_TEXT_COLOR
+    assert listed["typeface"] == DEFAULT_TYPEFACE
+    assert listed["text_scale"] == 0.07
+    assert _sidecar_bytes(source) == before
+
+
+def test_region_create_defaults_and_fits_on_image(admin_client, make_map):
+    source = make_map(admin_client, "Source")
+    target = make_map(admin_client, "Target")
+
+    defaulted = admin_client.post(_annotations_url(source), json=_region(target))
+    edge = admin_client.post(
+        _annotations_url(source),
+        json=_region(target, x=0.99, y=0.99, width=0.01, height=5),
+    )
+
+    assert defaulted.status_code == 201
+    assert defaulted.json()["width"] == DEFAULT_REGION_WIDTH
+    assert defaulted.json()["height"] == DEFAULT_REGION_HEIGHT
+    assert defaulted.json()["rest"]["opacity"] == MIN_OPACITY
+    assert defaulted.json()["hover"]["opacity"] == 0.4
+    assert edge.status_code == 201
+    assert edge.json()["width"] == MIN_REGION_SIZE
+    assert edge.json()["x"] + edge.json()["width"] <= 1
+    assert edge.json()["y"] + edge.json()["height"] <= 1
+
+
+def test_region_requires_target_and_rejects_text_fields(admin_client, make_map):
+    source = make_map(admin_client, "Source")
+
+    unknown = admin_client.post(_annotations_url(source), json=_region(UNKNOWN_ID))
+    text = admin_client.post(
+        _annotations_url(source), json=_region(source, text="not allowed")
+    )
+
+    assert unknown.status_code == 422
+    assert text.status_code == 422
+    assert _sidecar_bytes(source) == b""
+
+
+def test_region_appearance_clamps_and_patch_is_partial(admin_client, make_map):
+    source = make_map(admin_client, "Source")
+    region = admin_client.post(_annotations_url(source), json=_region(source)).json()
+
+    rest = admin_client.patch(
+        _annotation_url(source, region["id"]),
+        json={"rest": {"color": "#123456", "opacity": -2, "brightness": 99}},
+    )
+
+    assert rest.status_code == 200
+    assert rest.json()["rest"] == {
+        "color": "#123456",
+        "opacity": MIN_OPACITY,
+        "brightness": MAX_BRIGHTNESS,
+    }
+    assert rest.json()["hover"] == region["hover"]
+
+
+def test_region_invalid_color_and_text_update_leave_record_unchanged(
+    admin_client, make_map
+):
+    source = make_map(admin_client, "Source")
+    region = admin_client.post(_annotations_url(source), json=_region(source)).json()
+    before = _sidecar_bytes(source)
+
+    bad_color = admin_client.patch(
+        _annotation_url(source, region["id"]),
+        json={"hover": {"color": "blue", "opacity": 1, "brightness": 1}},
+    )
+    bad_text = admin_client.patch(
+        _annotation_url(source, region["id"]), json={"text": "No label"}
+    )
+
+    assert bad_color.status_code == 422
+    assert bad_text.status_code == 422
+    assert _sidecar_bytes(source) == before
+
+
+def test_region_image_attach_and_unauthenticated_write_are_refused(
+    admin_client, make_map, sample_png
+):
+    source = make_map(admin_client, "Source")
+    region = admin_client.post(_annotations_url(source), json=_region(source)).json()
+    attach = _attach(admin_client, source, region["id"], sample_png)
+    _sign_out(admin_client)
+    before = _sidecar_bytes(source)
+
+    patch = admin_client.patch(
+        _annotation_url(source, region["id"]), json={"width": 0.5}
+    )
+
+    assert attach.status_code == 409
+    assert patch.status_code == 401
+    assert _sidecar_bytes(source) == before

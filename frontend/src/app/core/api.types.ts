@@ -54,6 +54,8 @@ export interface TextLinkAnnotation extends AnnotationBase {
   target_map_id: string;
   /** Font size as a fraction of the map image's width, in [0.01, 0.10]. */
   text_scale: number;
+  color: string;
+  typeface: 'sans' | 'serif' | 'condensed';
   /** Computed server-side: false once the target map has been deleted. */
   target_available: boolean;
 }
@@ -70,7 +72,23 @@ export interface PoiAnnotation extends AnnotationBase {
   images: PoiImage[];
 }
 
-export type Annotation = TextLinkAnnotation | PoiAnnotation;
+export interface RegionAppearance {
+  color: string;
+  opacity: number;
+  brightness: number;
+}
+
+export interface RegionLinkAnnotation extends AnnotationBase {
+  kind: 'region_link';
+  target_map_id: string;
+  width: number;
+  height: number;
+  rest: RegionAppearance;
+  hover: RegionAppearance;
+  target_available: boolean;
+}
+
+export type Annotation = TextLinkAnnotation | PoiAnnotation | RegionLinkAnnotation;
 
 export interface AnnotationListResponse {
   annotations: Annotation[];
@@ -85,8 +103,20 @@ export type CreateAnnotationRequest =
       target_map_id: string;
       /** Omit to accept the server default (0.03). */
       text_scale?: number;
+      color?: string;
+      typeface?: 'sans' | 'serif' | 'condensed';
     }
-  | { kind: 'poi'; x: number; y: number; text: string };
+  | { kind: 'poi'; x: number; y: number; text: string }
+  | {
+      kind: 'region_link';
+      x: number;
+      y: number;
+      target_map_id: string;
+      width?: number;
+      height?: number;
+      rest?: RegionAppearance;
+      hover?: RegionAppearance;
+    };
 
 /** Partial update covering edit, resize, and reposition. `kind` is immutable. */
 export interface UpdateAnnotationRequest {
@@ -95,4 +125,10 @@ export interface UpdateAnnotationRequest {
   text?: string;
   target_map_id?: string;
   text_scale?: number;
+  color?: string;
+  typeface?: 'sans' | 'serif' | 'condensed';
+  width?: number;
+  height?: number;
+  rest?: RegionAppearance;
+  hover?: RegionAppearance;
 }

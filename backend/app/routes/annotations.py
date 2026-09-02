@@ -23,7 +23,15 @@ from ..models import (
     MessageResponse,
     PoiAnnotation,
     PoiImage,
+    RegionLinkAnnotation,
     TextLinkAnnotation,
+)
+from ..config import (
+    DEFAULT_HOVER_APPEARANCE,
+    DEFAULT_REST_APPEARANCE,
+    DEFAULT_TEXT_COLOR,
+    DEFAULT_TYPEFACE,
+    TYPEFACES,
 )
 
 router = APIRouter(prefix="/api/maps", tags=["annotations"])
@@ -63,7 +71,7 @@ def _image_url(map_id: str, annotation_id: str, image_id: str) -> str:
 
 def _to_api(
     map_id: str, record: annotations.Record, known_map_ids: set[str]
-) -> TextLinkAnnotation | PoiAnnotation:
+) -> TextLinkAnnotation | PoiAnnotation | RegionLinkAnnotation:
     """Project a stored record onto its API variant; disk layout stays private."""
     if record["kind"] == "text_link":
         return TextLinkAnnotation(
@@ -77,8 +85,30 @@ def _to_api(
             text=record["text"],
             target_map_id=record["target_map_id"],
             text_scale=record["text_scale"],
+            color=record.get("color", DEFAULT_TEXT_COLOR),
+            typeface=(
+                record.get("typeface", DEFAULT_TYPEFACE)
+                if record.get("typeface", DEFAULT_TYPEFACE) in TYPEFACES
+                else DEFAULT_TYPEFACE
+            ),
             # Resolved from the catalog the handler has already loaded, so the
             # frontend needs no lookup per label (research Decision 8).
+            target_available=record["target_map_id"] in known_map_ids,
+        )
+    if record["kind"] == "region_link":
+        return RegionLinkAnnotation(
+            id=record["id"],
+            kind="region_link",
+            map_id=map_id,
+            x=record["x"],
+            y=record["y"],
+            created_at=record["created_at"],
+            updated_at=record["updated_at"],
+            target_map_id=record["target_map_id"],
+            width=record["width"],
+            height=record["height"],
+            rest=record.get("rest", DEFAULT_REST_APPEARANCE),
+            hover=record.get("hover", DEFAULT_HOVER_APPEARANCE),
             target_available=record["target_map_id"] in known_map_ids,
         )
     return PoiAnnotation(
@@ -136,7 +166,7 @@ def list_annotations(map_id: str) -> AnnotationListResponse:
 )
 def create_annotation(
     map_id: str, payload: AnnotationCreateRequest
-) -> TextLinkAnnotation | PoiAnnotation:
+) -> TextLinkAnnotation | PoiAnnotation | RegionLinkAnnotation:
     """Place a text link or a point of interest on the map. Admin only (FR-045)."""
     require_map(map_id)
     try:
@@ -160,7 +190,7 @@ def create_annotation(
 )
 def update_annotation(
     map_id: str, annotation_id: str, changes: AnnotationUpdateRequest
-) -> TextLinkAnnotation | PoiAnnotation:
+) -> TextLinkAnnotation | PoiAnnotation | RegionLinkAnnotation:
     """Edit, resize, or reposition one annotation. Admin only (FR-039, FR-040)."""
     require_map(map_id)
     try:
