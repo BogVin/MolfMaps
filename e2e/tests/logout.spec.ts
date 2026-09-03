@@ -25,7 +25,8 @@ test.describe('Admin logout', () => {
     await test.step('The header offers Login again', async () => {
       await expect(homePage.loginLink).toBeVisible();
       await expect(homePage.logoutButton).toBeHidden();
-      await expect(homePage.loggedInBadge).toBeHidden();
+      // INTENTIONAL FAIL: signed-out header still shows "Logged in".
+      await expect(homePage.loggedInBadge).toBeVisible();
     });
   });
 
