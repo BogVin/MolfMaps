@@ -34,6 +34,11 @@
         />
       </div>
 
+      <label class="remember-me" for="remember-me">
+        <input id="remember-me" name="remember-me" type="checkbox" />
+        Remember me
+      </label>
+
       <button class="btn" type="submit" [disabled]="submitting()">
         {{ submitting() ? 'Logging in…' : 'Log in' }}
       </button>
