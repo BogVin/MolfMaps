@@ -1,3 +1,4 @@
+// COVERAGE_TAG: frontend/src/app/login/**, frontend/src/app/home/**
 import { expect, test } from '@playwright/test';
 
 import { adminCredentials, rejectedCredentials } from '../fixtures/credentials';
