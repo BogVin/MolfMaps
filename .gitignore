@@ -26,6 +26,8 @@ frontend/.angular/
 e2e/node_modules/
 e2e/test-results/
 e2e/playwright-report/
+e2e/test-results-new/
+e2e/playwright-report-new/
 e2e/blob-report/
 e2e/.cache/
 

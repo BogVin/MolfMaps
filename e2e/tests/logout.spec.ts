@@ -1,4 +1,3 @@
-// COVERAGE_TAG: frontend/src/app/home/**, frontend/src/app/login/**
 import { expect, test } from '@playwright/test';
 
 import { getApiSessionState, getSessionCookie } from '../fixtures/session';
