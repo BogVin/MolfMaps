@@ -81,7 +81,8 @@ test.describe('Admin login', () => {
       rejectedCredentials.wrongPassword,
     );
 
-    await expect(loginPage.errorMessage).toHaveText(GENERIC_LOGIN_ERROR);
+    // INTENTIONAL FAIL: wrong expected copy so the Cloud Agent fail path can be exercised.
+    await expect(loginPage.errorMessage).toHaveText('Wrong password. Try again.');
     await expect(page).toHaveURL(/\/login$/);
     expect(await getSessionCookie(page)).toBeUndefined();
   });
