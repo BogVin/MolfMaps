@@ -13,6 +13,12 @@ const SEEDED: MapSummary = {
   image_url: `/api/maps/${'a'.repeat(32)}/image`,
 };
 
+const SECOND_MAP: MapSummary = {
+  id: 'b'.repeat(32),
+  name: 'Mountain Pass',
+  image_url: `/api/maps/${'b'.repeat(32)}/image`,
+};
+
 function createComponent(
   authenticated: boolean,
   overrides: Partial<ApiService> = {},
@@ -72,6 +78,32 @@ describe('Maps', () => {
       fixture.nativeElement.querySelectorAll('.maps-list__link');
     expect(links.length).toBe(1);
     expect(links[0].textContent?.trim()).toBe('Kal Main Map');
+  });
+
+  it('filters maps by name without changing the catalog', () => {
+    const fixture = createComponent(false, {
+      listMaps: () => of({ maps: [SEEDED, SECOND_MAP] }),
+    } as unknown as Partial<ApiService>);
+
+    fixture.componentInstance.searchQuery.set('mountain');
+    fixture.detectChanges();
+
+    const links: NodeListOf<HTMLAnchorElement> =
+      fixture.nativeElement.querySelectorAll('.maps-list__link');
+    expect(Array.from(links, (link) => link.textContent?.trim())).toEqual(['Mountain Pass']);
+    expect(fixture.componentInstance.maps()).toEqual([SEEDED, SECOND_MAP]);
+  });
+
+  it('shows a specific empty state when no map matches the search', () => {
+    const fixture = createComponent(false);
+
+    fixture.componentInstance.searchQuery.set('unknown');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.maps-list')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[role="status"]').textContent).toContain(
+      'No maps match “unknown”.',
+    );
   });
 
   it('shows the empty state when the catalog has no maps', () => {

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -19,6 +19,13 @@ export class Maps implements OnInit {
   private readonly api = inject(ApiService);
 
   readonly maps = signal<MapSummary[]>([]);
+  readonly searchQuery = signal('');
+  readonly filteredMaps = computed(() => {
+    const query = this.searchQuery().trim().toLocaleLowerCase();
+    return query
+      ? this.maps().filter((map) => map.name.toLocaleLowerCase().includes(query))
+      : this.maps();
+  });
   readonly loading = signal(true);
   readonly loadError = signal('');
 

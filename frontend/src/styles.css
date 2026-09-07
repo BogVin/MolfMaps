@@ -651,6 +651,11 @@ app-map-view {
   color: var(--muted);
 }
 
+.maps-search {
+  max-width: 24rem;
+  margin-bottom: 1rem;
+}
+
 .maps-list {
   list-style: none;
   margin: 0;
