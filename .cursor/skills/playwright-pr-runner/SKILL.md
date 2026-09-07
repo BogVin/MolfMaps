@@ -55,7 +55,7 @@ Read the changed components and their templates first, then follow the `playwrig
 - The app ships no `data-testid`, so locate by role and label as the existing page objects do.
 - Cover the happy path plus at least one failure or edge case, roughly 3-6 tests per screen. Tag every test `@p1`-`@p4`.
 - Condition-based waits only. Clean up anything the test creates in `afterEach`/`afterAll` inside `try/catch`.
-- Wrap each meaningful action in `test.step()` with a reviewer-readable title. Those titles become the trace timeline and the run log, so they are how the test explains itself to a human.
+- Wrap each meaningful action in `test.step()` with a reviewer-readable title. Those titles become the trace timeline, the run log, and the caption burnt into the video, so they are how the test explains itself to a human.
 
 ## 4. Run the tests in scope
 From `e2e/`, with `CI=true` so retries, workers, and `webServer.reuseExistingServer` match CI:
@@ -88,6 +88,8 @@ CI=true PLAYWRIGHT_HTML_OPEN=never PLAYWRIGHT_LIST_PRINT_STEPS=1 \
 `PLAYWRIGHT_LIST_PRINT_STEPS=1` prints every `test.step` title, which makes `run.log` a readable walkthrough of what each test did. Keep the log outside `test-results-new/` — Playwright wipes that directory when a run starts, so a log written into it disappears. These results count toward the PR verdict exactly like any other test.
 
 There are no `--video` or `--screenshot` CLI flags — that is why this step uses a config file rather than flags.
+
+The capture config also paces and captions the recording, because a raw Playwright video is unwatchable: with no think-time between actions, a login flow finishes in about three seconds. It holds each input action on screen for a second while highlighting the target element and naming the call, draws a cursor that travels between actions, overlays the current `test.step()` title, and records at the full 1280x720 viewport instead of the 800x450 Playwright would otherwise scale down to. That padding is charged to the test timeout, which is why the capture config raises it — expect these runs to take noticeably longer than step 4, and never point the capture config at the whole suite.
 
 ## 6. Triage failures in specs you just wrote
 A test you authored carries the same verdict weight as any other, so a bad locator would fail the PR for no reason. For each failure in a new spec, open its trace, screenshot, and the component source, then decide:
