@@ -69,42 +69,58 @@
     @if (deleteError()) {
       <p class="form-error" role="alert">{{ deleteError() }}</p>
     }
-    <ul class="maps-list">
-      @for (map of maps(); track map.id) {
-        <li class="maps-list__row">
-          <a class="maps-list__link" [routerLink]="['/maps', map.id]">{{ map.name }}</a>
-          @if (authenticated()) {
-            <span class="maps-list__actions">
-              @if (pendingDeleteId() === map.id) {
-                <span class="confirm-prompt">Delete permanently?</span>
-                <button
-                  class="btn btn-small btn-danger"
-                  type="button"
-                  (click)="confirmDelete(map.id)"
-                >
-                  Confirm
-                </button>
-                <button
-                  class="btn btn-small btn-secondary"
-                  type="button"
-                  (click)="cancelDelete()"
-                >
-                  Cancel
-                </button>
-              } @else {
-                <button
-                  class="btn btn-small btn-danger maps-list__delete"
-                  type="button"
-                  [attr.aria-label]="'Delete ' + map.name"
-                  (click)="askDelete(map.id)"
-                >
-                  Delete
-                </button>
-              }
-            </span>
-          }
-        </li>
-      }
-    </ul>
+    <div class="maps-search field">
+      <label for="map-search">Search maps</label>
+      <input
+        id="map-search"
+        type="search"
+        autocomplete="off"
+        placeholder="Search by map name"
+        [ngModel]="searchQuery()"
+        (ngModelChange)="searchQuery.set($event)"
+      />
+    </div>
+
+    @if (filteredMaps().length === 0) {
+      <p class="maps-empty" role="status">No maps match “{{ searchQuery().trim() }}”.</p>
+    } @else {
+      <ul class="maps-list">
+        @for (map of filteredMaps(); track map.id) {
+          <li class="maps-list__row">
+            <a class="maps-list__link" [routerLink]="['/maps', map.id]">{{ map.name }}</a>
+            @if (authenticated()) {
+              <span class="maps-list__actions">
+                @if (pendingDeleteId() === map.id) {
+                  <span class="confirm-prompt">Delete permanently?</span>
+                  <button
+                    class="btn btn-small btn-danger"
+                    type="button"
+                    (click)="confirmDelete(map.id)"
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    class="btn btn-small btn-secondary"
+                    type="button"
+                    (click)="cancelDelete()"
+                  >
+                    Cancel
+                  </button>
+                } @else {
+                  <button
+                    class="btn btn-small btn-danger maps-list__delete"
+                    type="button"
+                    [attr.aria-label]="'Delete ' + map.name"
+                    (click)="askDelete(map.id)"
+                  >
+                    Delete
+                  </button>
+                }
+              </span>
+            }
+          </li>
+        }
+      </ul>
+    }
   }
 </main>
