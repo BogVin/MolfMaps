@@ -117,12 +117,20 @@ cp -R e2e/test-results-new artifacts/playwright/new-tests/runs
 
 `runs/` holds one directory per test with `video.webm`, `trace.zip`, and an end-of-test screenshot — for passing and failing tests alike. `run.log` is already in place from step 5.
 
-`report/` embeds those same files under hashed names, so the bundle carries each recording twice — roughly 6 MB per test all in. That is deliberate: `runs/` has readable directory names and its videos open in anything, while `report/` is the richer view but needs `npx playwright show-report` to render. If a PR ever authors enough tests for the size to matter, drop `runs/` and keep the report.
+`report/` embeds those same files under hashed names, so the bundle carries each recording twice — roughly 6 MB per test all in. That is deliberate: `runs/` files open in anything, while `report/` is the richer view but needs `npx playwright show-report` to render. If a PR ever authors enough tests for the size to matter, drop `runs/` and keep the report plus `videos/`.
+
+Playwright names its output directories after the test but truncates them with a hash. Copy each video out under a name a reviewer can read, because that filename is what appears in the PR description:
+
+```bash
+mkdir -p artifacts/playwright/new-tests/videos
+cp e2e/test-results-new/<playwright-dir>/video.webm \
+   artifacts/playwright/new-tests/videos/<screen>-<short-test-title>.webm
+```
 
 Then write `artifacts/playwright/new-tests/README.md` so a human can act on it without hunting through directories. Lead with how to view things:
 
 ```
-Watch a test:   open new-tests/runs/<test-dir>/video.webm
+Watch a test:   open new-tests/videos/<screen>-<short-test-title>.webm
 Step through:   npx playwright show-trace new-tests/runs/<test-dir>/trace.zip
 Everything:     npx playwright show-report new-tests/report
 Read the steps: new-tests/run.log
@@ -135,6 +143,16 @@ Then list every new test with its title, its result, one line on what it proves,
 - **Failing — unresolved.** You could not get it working in 2 attempts. Say what is unresolved instead of presenting it as coverage.
 
 Write `artifacts/playwright/summary.md` for the PR comment: scope from step 1, what ran, pass/fail counts, each failure with its likely cause, and the new-test grouping above. Read up to 3 failure screenshots so they attach to the Cloud Agent run.
+
+### Where these artifacts end up
+`artifacts/` at the repo root is the Cloud Agent artifact directory, which is why everything above is written there. Files placed in it are uploaded off the VM and outlive the run; the rest of the workspace is recycled once the run goes idle. With **Allow posting artifacts to GitHub** enabled in the Cloud Agents dashboard, Cursor embeds them into the PR description using long unguessable URLs that need no login, so a reviewer opens them straight from the PR. Without that setting the artifacts are still stored, but only reachable through the agent run — which requires a Cursor account with access to this repo — or through the Cloud Agents API.
+
+Two constraints come with that:
+
+- **Never commit artifacts into the repo.** A committed video stays in git history forever, even after a later cleanup commit deletes the file. `artifacts/` is gitignored; keep it that way.
+- If the environment uses restricted network egress, allowlist `cloud-agent-artifacts.s3.us-east-1.amazonaws.com` exactly. Without it the upload fails while the rest of the run looks fine. Do not widen it to `*.s3.us-east-1.amazonaws.com`.
+
+Cursor documents this embedding for screenshots, videos, and log references. Whether a `trace.zip` or the multi-file `report/` directory is served the same way is **not** documented — check the first real run. If they do not appear in the description, treat the videos, screenshots, and `run.log` as the reviewer-facing artifacts and leave the trace and report for whoever opens the run itself.
 
 ## 8. Commit and push the new specs
 Only when step 3 or 6 changed files, and only test paths:
@@ -151,7 +169,8 @@ Never `git add -A` — `backend/.env`, `artifacts/`, and the `test-results-new/`
 Use `artifacts/playwright/summary.md` as the body.
 
 - Final assistant message **must** be that summary (Cloud Agent run + automation `prComment` tool).
-- When this run wrote tests, the summary must name each new test with its result and point at the new-tests bundle, so the reviewer knows there is a video to watch.
+- When this run wrote tests, name each new test with its result **and the exact artifact filename** for its video. Cursor attaches the artifacts to the PR description on its own; your job is to give the reviewer the mapping from test name to file, so the embedded media is identifiable.
+- Do not rewrite the PR description yourself. The artifact links land there through the dashboard setting, and hand-editing the body risks clobbering them.
 - If `gh` can see the PR, also post it: `gh pr comment --body-file artifacts/playwright/summary.md`. If `gh` fails, still return the summary as the final message.
 - Never mention secret values or `.env` contents.
 
@@ -167,6 +186,7 @@ Use `artifacts/playwright/summary.md` as the body.
 - Author API-only, backend, or Angular unit tests
 - Write UI tests for a PR that changed no `frontend/src/**` file
 - Ship a new test without its video and trace — the code alone is not the artifact
+- Commit anything from `artifacts/` into the repo; binaries in git history are permanent
 - Run the capture config against the whole suite; it is for newly written specs only
 - Weaken or delete an assertion to turn a failure green
 - Commit anything outside `e2e/`, or force-push
@@ -181,8 +201,10 @@ Use `artifacts/playwright/summary.md` as the body.
 - [ ] New specs carry priority tags, `test.step()` titles, and cleanup
 - [ ] Playwright ran with `CI=true` from `e2e/`
 - [ ] HTML report and failure media are under `artifacts/playwright/`
-- [ ] Every new test has a video and a trace under `new-tests/runs/`, passing ones included
+- [ ] Every new test has a video and a trace under `new-tests/`, passing ones included
+- [ ] Each video is named after its test, so the PR description is readable
 - [ ] `new-tests/README.md` lists each new test, its result, and how to view it
+- [ ] Artifacts live under `artifacts/` and none of them were committed
 - [ ] New specs are committed and pushed to the PR branch, or the push failure is reported
 - [ ] No application code changed
 - [ ] Final message is the PR feedback summary
@@ -192,7 +214,13 @@ Use `artifacts/playwright/summary.md` as the body.
 When you create the Cursor Automation (trigger: pull request opened / pushed), use this as the agent prompt:
 
 ```
-Follow the playwright-pr-runner skill. Run the Playwright UI tests related to this pull request, write UI specs for any changed screen that has no coverage, run those new specs through playwright.capture.config.ts so each one has a video and trace, collect artifacts under artifacts/playwright/ including the new-tests bundle, commit and push the new specs, and comment the summary on the PR. Do not change application code.
+Follow the playwright-pr-runner skill. Run the Playwright UI tests related to this pull request, write UI specs for any changed screen that has no coverage, run those new specs through playwright.capture.config.ts so each one has a video and trace, collect artifacts under artifacts/playwright/ including the new-tests bundle, commit and push the new specs, and comment the summary on the PR. Do not change application code, and do not commit artifacts.
 ```
 
-Enable **Comment on pull requests** and write access to the branch. In the Cloud Agent environment, set secrets `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and `SESSION_SECRET` (same values as local `backend/.env`).
+Dashboard settings this skill depends on:
+
+- **Comment on pull requests**, plus write access to the branch, so new specs can be pushed.
+- **Allow posting artifacts to GitHub** — without it, nothing from `artifacts/` reaches the PR description and the videos are only visible to whoever opens the agent run.
+- If egress is restricted, allowlist `cloud-agent-artifacts.s3.us-east-1.amazonaws.com`.
+
+In the Cloud Agent environment, set secrets `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and `SESSION_SECRET` (same values as local `backend/.env`). Prefer Runtime Secrets so the values are redacted from the transcript and from anything the agent commits.
