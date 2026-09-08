@@ -8,11 +8,11 @@ import baseConfig from './playwright.config';
 // flow is over in about three seconds, which is too fast to follow.
 const ACTION_ANNOTATION_MS = 1_000;
 
-// Used to run specs that were just authored for a pull request, so a reviewer
-// can watch how they behave. The shared config keeps video and screenshots
-// only on failure, which leaves a passing new test with nothing to show — here
-// everything is captured whatever the outcome. Retries stay off so each test
-// produces exactly one video instead of one per attempt.
+// Used to run specs authored from a Jira ticket so a reviewer can watch how
+// they behave. The shared config keeps video and screenshots only on failure,
+// which leaves a passing new test with nothing to show — here everything is
+// captured whatever the outcome. Retries stay off so each test produces
+// exactly one video instead of one per attempt.
 export default defineConfig({
   ...baseConfig,
   outputDir: './test-results-new',

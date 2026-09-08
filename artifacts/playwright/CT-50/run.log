@@ -1,0 +1,88 @@
+[WebServer] Starting backend on http://localhost:8000 ...
+[WebServer] Starting frontend on http://localhost:4200 ...
+[WebServer] 
+[WebServer] MolfMaps is running:
+[WebServer]   API:  http://localhost:8000
+[WebServer]   App:  http://localhost:4200  (proxies /api → :8000)
+[WebServer] 
+[WebServer] Press Ctrl+C to stop both.
+[WebServer] 
+[WebServer] > frontend@0.0.0 start
+[WebServer] > ng serve --proxy-config proxy.conf.json --host 127.0.0.1 --port 4200
+[WebServer] 
+[WebServer] INFO:     Will watch for changes in these directories: ['/Users/bvintoni/AITestExamples/MolfMaps/backend']
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+[WebServer] INFO:     Started reloader process [47844] using WatchFiles
+[WebServer] INFO:     Started server process [47885]
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+[WebServer] ❯ Building...
+[WebServer] ✔ Building...
+[WebServer] Initial chunk files | Names         |  Raw size
+[WebServer] main.js             | main          | 184.39 kB | 
+[WebServer] styles.css          | styles        |  12.79 kB | 
+[WebServer] 
+[WebServer]                     | Initial total | 197.18 kB
+[WebServer] 
+[WebServer] Application bundle generation complete. [1.619 seconds] - 2026-09-08T12:06:15.369Z
+[WebServer] 
+[WebServer] Watch mode enabled. Watching for file changes...
+[WebServer] NOTE: Raw file sizes do not reflect development server per-request transformations.
+[WebServer]   ➜  Local:   http://127.0.0.1:4200/
+
+Running 1 test using 1 worker
+
+(node:47937) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] INFO:     127.0.0.1:55436 - "GET /api/session HTTP/1.1" 200 OK
+[WebServer] INFO:     127.0.0.1:55442 - "GET /api/session HTTP/1.1" 200 OK
+     1.1 [chromium] › tests/map-compare.spec.ts:58:7 › Favorite map comparison › @p1 Admin can select two favorites and open a side-by-side comparison › Open the catalog and favorite three maps (3.8s)
+     1.2 [chromium] › tests/map-compare.spec.ts:58:7 › Favorite map comparison › @p1 Admin can select two favorites and open a side-by-side comparison › Switch to Favorites so compare mode can appear (1.0s)
+     1.3 [chromium] › tests/map-compare.spec.ts:58:7 › Favorite map comparison › @p1 Admin can select two favorites and open a side-by-side comparison › Reveal the Compare maps control required by CT-50 (5.0s)
+  ✘  1 [chromium] › tests/map-compare.spec.ts:58:7 › Favorite map comparison › @p1 Admin can select two favorites and open a side-by-side comparison (11.4s)
+
+
+  1) [chromium] › tests/map-compare.spec.ts:58:7 › Favorite map comparison › @p1 Admin can select two favorites and open a side-by-side comparison › Reveal the Compare maps control required by CT-50 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('button', { name: 'Compare maps' })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('button', { name: 'Compare maps' })
+
+
+      82 |     await test.step('Reveal the Compare maps control required by CT-50', async () => {
+      83 |       // Intentionally unimplemented feature: this control does not exist yet.
+    > 84 |       await expect(page.getByRole('button', { name: 'Compare maps' })).toBeVisible();
+         |                                                                        ^
+      85 |     });
+      86 |
+      87 |     await test.step('Select exactly two favorites for comparison', async () => {
+        at /Users/bvintoni/AITestExamples/MolfMaps/e2e/tests/map-compare.spec.ts:84:72
+        at /Users/bvintoni/AITestExamples/MolfMaps/e2e/tests/map-compare.spec.ts:82:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results-new/map-compare-Favorite-map-c-06cb0-n-a-side-by-side-comparison-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results-new/map-compare-Favorite-map-c-06cb0-n-a-side-by-side-comparison-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results-new/map-compare-Favorite-map-c-06cb0-n-a-side-by-side-comparison-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results-new/map-compare-Favorite-map-c-06cb0-n-a-side-by-side-comparison-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results-new/map-compare-Favorite-map-c-06cb0-n-a-side-by-side-comparison-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › tests/map-compare.spec.ts:58:7 › Favorite map comparison › @p1 Admin can select two favorites and open a side-by-side comparison 
