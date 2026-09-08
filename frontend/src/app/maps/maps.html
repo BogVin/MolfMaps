@@ -69,27 +69,89 @@
     @if (deleteError()) {
       <p class="form-error" role="alert">{{ deleteError() }}</p>
     }
-    <div class="maps-search field">
-      <label for="map-search">Search maps</label>
-      <input
-        id="map-search"
-        type="search"
-        autocomplete="off"
-        placeholder="Search by map name"
-        [ngModel]="searchQuery()"
-        (ngModelChange)="searchQuery.set($event)"
-      />
-    </div>
 
-    @if (filteredMaps().length === 0) {
+    <section class="maps-organize" aria-label="Organize maps">
+      <div class="maps-search field">
+        <label for="map-search">Search maps</label>
+        <input
+          id="map-search"
+          type="search"
+          autocomplete="off"
+          placeholder="Search by map name"
+          [ngModel]="searchQuery()"
+          (ngModelChange)="searchQuery.set($event)"
+        />
+      </div>
+
+      <div class="maps-organize__row">
+        <div class="maps-filter" role="group" aria-label="Filter maps">
+          <button
+            class="btn btn-small"
+            type="button"
+            [attr.aria-pressed]="catalogFilter() === 'all'"
+            (click)="setCatalogFilter('all')"
+          >
+            All maps
+          </button>
+          <button
+            class="btn btn-small"
+            type="button"
+            [attr.aria-pressed]="catalogFilter() === 'favorites'"
+            (click)="setCatalogFilter('favorites')"
+          >
+            Favorites
+          </button>
+        </div>
+
+        <div class="maps-sort" role="group" aria-label="Sort maps">
+          <button
+            class="btn btn-small"
+            type="button"
+            [attr.aria-pressed]="catalogSort() === 'name-asc'"
+            (click)="setCatalogSort('name-asc')"
+          >
+            Sort A–Z
+          </button>
+          <button
+            class="btn btn-small"
+            type="button"
+            [attr.aria-pressed]="catalogSort() === 'name-desc'"
+            (click)="setCatalogSort('name-desc')"
+          >
+            Sort Z–A
+          </button>
+        </div>
+
+        <button class="btn btn-small btn-secondary" type="button" (click)="resetOrganization()">
+          Reset
+        </button>
+      </div>
+
+      <p class="maps-result-count" role="status">{{ resultCountLabel() }}</p>
+    </section>
+
+    @if (emptyFavorites()) {
+      <p class="maps-empty" role="status">No favorite maps yet. Mark a map as a favorite to see it here.</p>
+    } @else if (filteredMaps().length === 0) {
       <p class="maps-empty" role="status">No maps match “{{ searchQuery().trim() }}”.</p>
     } @else {
       <ul class="maps-list">
         @for (map of filteredMaps(); track map.id) {
           <li class="maps-list__row">
             <a class="maps-list__link" [routerLink]="['/maps', map.id]">{{ map.name }}</a>
-            @if (authenticated()) {
-              <span class="maps-list__actions">
+            <span class="maps-list__actions">
+              <button
+                class="btn btn-small btn-secondary maps-list__favorite"
+                type="button"
+                [attr.aria-pressed]="isFavorite(map.id)"
+                [attr.aria-label]="
+                  isFavorite(map.id) ? 'Unfavorite ' + map.name : 'Favorite ' + map.name
+                "
+                (click)="toggleFavorite(map.id)"
+              >
+                {{ isFavorite(map.id) ? 'Favorited' : 'Favorite' }}
+              </button>
+              @if (authenticated()) {
                 @if (pendingDeleteId() === map.id) {
                   <span class="confirm-prompt">Delete permanently?</span>
                   <button
@@ -116,8 +178,8 @@
                     Delete
                   </button>
                 }
-              </span>
-            }
+              }
+            </span>
           </li>
         }
       </ul>

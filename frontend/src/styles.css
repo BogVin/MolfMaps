@@ -651,9 +651,42 @@ app-map-view {
   color: var(--muted);
 }
 
+.maps-organize {
+  margin-bottom: 1rem;
+}
+
 .maps-search {
   max-width: 24rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.maps-organize__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.maps-filter,
+.maps-sort {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.maps-filter .btn[aria-pressed='true'],
+.maps-sort .btn[aria-pressed='true'],
+.maps-list__favorite[aria-pressed='true'] {
+  background: var(--accent);
+  color: #0f1419;
+  border-color: var(--accent);
+}
+
+.maps-result-count {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .maps-list {
