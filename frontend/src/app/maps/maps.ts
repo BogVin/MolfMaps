@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -9,6 +9,10 @@ import { MapSummary } from '../core/api.types';
 const LOAD_ERROR = 'Could not load the maps. Please try again.';
 const GENERIC_ERROR = 'Something went wrong. Please try again.';
 const SESSION_EXPIRED = 'Your session has expired. Please log in again.';
+const FAVORITES_STORAGE_KEY = 'molfmaps.catalog.favorites';
+
+export type CatalogFilter = 'all' | 'favorites';
+export type CatalogSort = 'name-asc' | 'name-desc';
 
 @Component({
   selector: 'app-maps',
@@ -19,6 +23,49 @@ export class Maps implements OnInit {
   private readonly api = inject(ApiService);
 
   readonly maps = signal<MapSummary[]>([]);
+  readonly searchQuery = signal('');
+  readonly favoriteIds = signal<ReadonlySet<string>>(new Set());
+  readonly catalogFilter = signal<CatalogFilter>('all');
+  readonly catalogSort = signal<CatalogSort>('name-asc');
+
+  readonly filteredMaps = computed(() => {
+    const query = this.searchQuery().trim().toLocaleLowerCase();
+    const favoritesOnly = this.catalogFilter() === 'favorites';
+    const favorites = this.favoriteIds();
+    const sort = this.catalogSort();
+
+    const matches = this.maps().filter((map) => {
+      if (favoritesOnly && !favorites.has(map.id)) {
+        return false;
+      }
+      if (!query) {
+        return true;
+      }
+      return map.name.toLocaleLowerCase().includes(query);
+    });
+
+    return [...matches].sort((left, right) => {
+      const byName = left.name.localeCompare(right.name, undefined, {
+        sensitivity: 'base',
+      });
+      return sort === 'name-asc' ? byName : -byName;
+    });
+  });
+
+  readonly resultCountLabel = computed(() => {
+    const visible = this.filteredMaps().length;
+    const total = this.maps().length;
+    return `Showing ${visible} of ${total} maps`;
+  });
+
+  readonly emptyFavorites = computed(
+    () =>
+      this.catalogFilter() === 'favorites' &&
+      this.favoriteIds().size === 0 &&
+      this.maps().length > 0 &&
+      !this.searchQuery().trim(),
+  );
+
   readonly loading = signal(true);
   readonly loadError = signal('');
 
@@ -37,6 +84,7 @@ export class Maps implements OnInit {
   readonly sessionNotice = signal('');
 
   ngOnInit(): void {
+    this.favoriteIds.set(this.readFavoriteIds());
     this.refreshSession();
     this.loadMaps();
   }
@@ -109,6 +157,7 @@ export class Maps implements OnInit {
     this.api.deleteMap(id).subscribe({
       next: () => {
         this.pendingDeleteId.set(null);
+        this.removeFavorite(id);
         this.loadMaps();
       },
       error: (err: unknown) => {
@@ -116,6 +165,69 @@ export class Maps implements OnInit {
         this.deleteError.set(this.messageFor(err));
       },
     });
+  }
+
+  isFavorite(id: string): boolean {
+    return this.favoriteIds().has(id);
+  }
+
+  toggleFavorite(id: string): void {
+    const next = new Set(this.favoriteIds());
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    this.favoriteIds.set(next);
+    this.writeFavoriteIds(next);
+  }
+
+  setCatalogFilter(filter: CatalogFilter): void {
+    this.catalogFilter.set(filter);
+  }
+
+  setCatalogSort(sort: CatalogSort): void {
+    this.catalogSort.set(sort);
+  }
+
+  resetOrganization(): void {
+    this.searchQuery.set('');
+    this.catalogFilter.set('all');
+    this.catalogSort.set('name-asc');
+  }
+
+  private removeFavorite(id: string): void {
+    if (!this.favoriteIds().has(id)) {
+      return;
+    }
+    const next = new Set(this.favoriteIds());
+    next.delete(id);
+    this.favoriteIds.set(next);
+    this.writeFavoriteIds(next);
+  }
+
+  private readFavoriteIds(): ReadonlySet<string> {
+    try {
+      const raw = localStorage.getItem(FAVORITES_STORAGE_KEY);
+      if (!raw) {
+        return new Set();
+      }
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return new Set();
+      }
+      return new Set(parsed.filter((value): value is string => typeof value === 'string'));
+    } catch {
+      return new Set();
+    }
+  }
+
+  private writeFavoriteIds(ids: ReadonlySet<string>): void {
+    try {
+      localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify([...ids]));
+    } catch {
+      // Persistence is best-effort; the in-memory favorite set still works.
+    }
   }
 
   private messageFor(err: unknown): string {
