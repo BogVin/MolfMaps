@@ -8,9 +8,10 @@ screenshots, source copies, and stepped logs. Written by the
 A video or trace committed to the repo would stay in git history permanently,
 even after a later commit deleted the file.
 
-These artifacts remain local. The available Jira MCP integration can update an
-issue description but cannot upload attachments, so the description records
-the exact local evidence paths without claiming they are remote links.
+These artifacts remain local. The skill posts run summaries as **Jira
+comments** (never edits the ticket description) and records exact local
+evidence paths. The available Jira MCP integration cannot upload attachments,
+so those paths are references, not remote download links.
 
 ## Layout
 
@@ -18,8 +19,8 @@ the exact local evidence paths without claiming they are remote links.
 artifacts/playwright/
   <JIRA-KEY>/
     README.md           Requirements, results, failures, and viewing commands
-    specs/              Sources of the specs/page objects that were written
-    videos/             One human-named video per new test
+    specs/              Sources of the specs/page objects that were run or written
+    videos/             One human-named video per test in the run
     runs/               Per-test video, trace, and screenshot
     report/             HTML report for the capture run
     run.log             Stepped log of the capture run
