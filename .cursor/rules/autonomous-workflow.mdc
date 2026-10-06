@@ -16,6 +16,7 @@ This plugin provides a multi-agent system for autonomous feature development. Ea
 | **planner** | Thinking | Architecture, planning, task breakdown | `@planner` or `Use the planner to...` |
 | **developer** | Fast | Code implementation | `@developer` or `Use the developer to...` |
 | **unit-tester** | Default | Unit test generation | `@unit-tester` or `Use the unit tester to...` |
+| **coverage-tester** | Default | Coverage check + tests in existing style | `@coverage-tester` or `Use the coverage tester to...` |
 | **playwright-tester** | Default | E2E test generation | `@playwright-tester` or `Use the playwright tester to...` |
 | **playwright-reviewer** | Thinking | E2E test quality review | `@playwright-reviewer` or `Use the playwright reviewer to...` |
 | **code-reviewer** | Thinking | Code quality review | `@code-reviewer` or `Use the code reviewer to...` |
@@ -54,6 +55,7 @@ Use the developer to implement [specific task from plan]
 ### Testing
 ```
 Use the unit tester to create tests for [source file or component]
+Use the coverage tester to check coverage and add missing tests for [feature or path]
 Use the playwright tester to create E2E tests for [user flow]
 Use the playwright reviewer to review E2E tests for [feature]
 Use the test iterator to run and fix tests for [feature]

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": ".cursor/hooks/protect-env-file.py",
+        "matcher": "Write|StrReplace|Delete|EditNotebook",
+        "failClosed": true,
+        "timeout": 10
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": ".cursor/hooks/protect-env-file.py",
+        "failClosed": true,
+        "timeout": 10
+      }
+    ]
+  }
+}

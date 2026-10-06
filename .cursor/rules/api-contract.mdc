@@ -1,0 +1,44 @@
+---
+description: Keep the FastAPI–Angular REST contract aligned (paths, DTOs, auth, errors)
+globs: frontend/src/app/core/api.*,backend/app/models.py,backend/app/routes/**/*.py,specs/**/contracts/openapi.yaml
+alwaysApply: false
+---
+
+# Frontend–backend API contract
+
+The frontend talks to the backend **only over HTTP**. Runtime truth is the schema FastAPI generates from Pydantic models. Feature docs live in `specs/*/contracts/openapi.yaml`. Angular DTOs live in `frontend/src/app/core/api.types.ts`; HTTP calls live only in `ApiService`.
+
+## Source of truth (in order)
+
+1. `backend/app/models.py` + `backend/app/routes/` (typed FastAPI; no untyped dicts on the wire)
+2. Latest feature `contracts/openapi.yaml` (must match generated `/openapi.json`)
+3. `api.types.ts` then `api.service.ts` (mirror JSON names and shapes)
+
+Do not add a field, path, status, or auth rule on one side only.
+
+## Alignment checklist (every API change)
+
+- **Path + method**: Angular uses relative `/api/...` (dev proxy → `localhost:8000`). Encode path ids. Do not invent a second URL builder for image bytes — use server `image_url` verbatim.
+- **JSON names**: snake_case, same as Pydantic (`target_map_id`, `text_scale`). No camelCase DTOs.
+- **Types**: TS interfaces match Pydantic (unions on `kind`, optionals only when the request schema allows omit). Discriminators stay required.
+- **Auth**: Public GETs omit credentials unless the cookie is needed; admin writes use `withCredentials: true`. UI hiding is not authorization.
+- **Errors**: Client-visible errors are `ErrorResponse` `{ detail: string }`. Do not leak internals.
+- **Compat**: Do not change inherited paths (`/api/map`, `/api/login`, `/api/logout`, `/api/session`, `/api/maps*`) unless the spec says so.
+
+```typescript
+// ❌ BAD — local DTO + composed URL + camelCase
+getAnnotations(mapId: string) {
+  return this.http.get<{ items: { targetMapId: string }[] }>(
+    `/api/maps/${mapId}/annotations`,
+  );
+}
+
+// ✅ GOOD — shared types, encoded id, contract path
+listAnnotations(mapId: string): Observable<AnnotationListResponse> {
+  return this.http.get<AnnotationListResponse>(
+    `/api/maps/${encodeURIComponent(mapId)}/annotations`,
+  );
+}
+```
+
+After a contract change, compare `models.py` ↔ `api.types.ts` ↔ `openapi.yaml` field-by-field, then add/adjust the matching `ApiService` method.
