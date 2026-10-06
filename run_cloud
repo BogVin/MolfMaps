@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+# Start MolfMaps for Cursor Cloud Desktop / Cloud Agents.
+#
+# Same two-process setup as ./run, but:
+#   - binds 0.0.0.0 so the Cloud port proxy can reach the listeners
+#   - allows any Host header (Vite blocks unknown Cloud preview hostnames)
+#   - waits until both ports answer, then tells you to open 4200 (not 8000)
+#
+# Opening port 8000 in preview is a FastAPI 404: that process is API-only.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKEND_PORT=8000
+FRONTEND_PORT=4200
+BIND_HOST=0.0.0.0
+BACKEND_PID=""
+FRONTEND_PID=""
+
+# Disable Angular CLI interactive analytics prompt (breaks non-TTY / scripted runs).
+export NG_CLI_ANALYTICS=false
+
+free_port() {
+  local port="$1"
+  local pids
+  pids="$(lsof -tiTCP:"${port}" -sTCP:LISTEN 2>/dev/null || true)"
+  if [[ -z "${pids}" ]]; then
+    return 0
+  fi
+  echo "Port ${port} is in use — stopping PID(s): ${pids}"
+  # shellcheck disable=SC2086
+  kill ${pids} 2>/dev/null || true
+  sleep 0.5
+  pids="$(lsof -tiTCP:"${port}" -sTCP:LISTEN 2>/dev/null || true)"
+  if [[ -n "${pids}" ]]; then
+    # shellcheck disable=SC2086
+    kill -9 ${pids} 2>/dev/null || true
+  fi
+}
+
+cleanup() {
+  echo ""
+  echo "Stopping MolfMaps..."
+  if [[ -n "${FRONTEND_PID}" ]] && kill -0 "${FRONTEND_PID}" 2>/dev/null; then
+    kill "${FRONTEND_PID}" 2>/dev/null || true
+    wait "${FRONTEND_PID}" 2>/dev/null || true
+  fi
+  if [[ -n "${BACKEND_PID}" ]] && kill -0 "${BACKEND_PID}" 2>/dev/null; then
+    kill "${BACKEND_PID}" 2>/dev/null || true
+    wait "${BACKEND_PID}" 2>/dev/null || true
+  fi
+  free_port "${FRONTEND_PORT}"
+  free_port "${BACKEND_PORT}"
+  echo "Stopped."
+}
+
+wait_for_http() {
+  local url="$1"
+  local label="$2"
+  local attempts="${3:-90}"
+  local i
+  for ((i = 1; i <= attempts; i++)); do
+    if curl -sf -o /dev/null --max-time 2 "${url}"; then
+      echo "${label} is ready (${url})"
+      return 0
+    fi
+    sleep 1
+  done
+  echo "warning: ${label} did not become ready at ${url}" >&2
+  return 1
+}
+
+trap cleanup EXIT INT TERM
+
+# --- Backend -----------------------------------------------------------------
+BACKEND_DIR="${ROOT}/backend"
+VENV="${BACKEND_DIR}/.venv"
+
+if [[ ! -d "${VENV}" ]]; then
+  echo "Creating backend virtualenv..."
+  python3 -m venv "${VENV}"
+  # shellcheck disable=SC1091
+  source "${VENV}/bin/activate"
+  pip install -r "${BACKEND_DIR}/requirements.txt"
+else
+  # shellcheck disable=SC1091
+  source "${VENV}/bin/activate"
+fi
+
+if [[ ! -f "${BACKEND_DIR}/.env" ]]; then
+  if [[ -f "${BACKEND_DIR}/.env.example" ]]; then
+    echo "No backend/.env found — copying from .env.example"
+    cp "${BACKEND_DIR}/.env.example" "${BACKEND_DIR}/.env"
+  else
+    echo "error: backend/.env is missing (and no .env.example to copy)" >&2
+    exit 1
+  fi
+fi
+
+free_port "${BACKEND_PORT}"
+free_port "${FRONTEND_PORT}"
+
+echo "Starting backend on http://${BIND_HOST}:${BACKEND_PORT} ..."
+(
+  cd "${BACKEND_DIR}"
+  exec uvicorn app.main:app --reload --host "${BIND_HOST}" --port "${BACKEND_PORT}"
+) &
+BACKEND_PID=$!
+
+# --- Frontend ----------------------------------------------------------------
+FRONTEND_DIR="${ROOT}/frontend"
+
+if [[ ! -d "${FRONTEND_DIR}/node_modules" ]]; then
+  echo "Installing frontend dependencies..."
+  (cd "${FRONTEND_DIR}" && npm ci)
+fi
+
+echo "Starting frontend on http://${BIND_HOST}:${FRONTEND_PORT} ..."
+(
+  cd "${FRONTEND_DIR}"
+  # --allowed-hosts=true: Cloud preview Host is not localhost (Vite 6 / Angular 22).
+  exec npm start -- \
+    --host "${BIND_HOST}" \
+    --port "${FRONTEND_PORT}" \
+    --allowed-hosts=true
+) &
+FRONTEND_PID=$!
+
+echo ""
+echo "Waiting for Cloud Desktop listeners..."
+wait_for_http "http://127.0.0.1:${BACKEND_PORT}/api/maps" "API" || true
+wait_for_http "http://127.0.0.1:${FRONTEND_PORT}/" "App" || true
+
+echo ""
+echo "MolfMaps is running for Cloud Desktop:"
+echo "  App (open this in Forwarded Ports / Preview):  port ${FRONTEND_PORT}"
+echo "  API (do not preview this — GET / is a 404):    port ${BACKEND_PORT}"
+echo ""
+echo "In the Cloud Desktop plug / Forwarded Ports menu, open ${FRONTEND_PORT}."
+echo "Port ${FRONTEND_PORT} proxies /api → :${BACKEND_PORT} on this VM."
+echo ""
+echo "Press Ctrl+C to stop both."
+
+wait
