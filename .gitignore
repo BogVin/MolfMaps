@@ -16,6 +16,9 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 
+# Portable Node installed by ./run_cloud when the host Node is below Angular 22's floor
+.node/
+
 # Node / Angular frontend
 frontend/node_modules/
 frontend/dist/
