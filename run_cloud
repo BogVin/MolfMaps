@@ -4,15 +4,19 @@
 # Same two-process setup as ./run, but:
 #   - binds 0.0.0.0 so the Cloud port proxy can reach the listeners
 #   - allows any Host header (Vite blocks unknown Cloud preview hostnames)
+#   - installs a portable Node if the host is below Angular 22's floor (v22.22.3)
 #   - waits until both ports answer, then tells you to open 4200 (not 8000)
 #
 # Opening port 8000 in preview is a FastAPI 404: that process is API-only.
+# Cloud Desktop often ships Node 22.22.2; Angular CLI 22 exits before ng serve.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_PORT=8000
 FRONTEND_PORT=4200
 BIND_HOST=0.0.0.0
+# Minimum Node that @angular/cli 22 will actually boot (hard exit in bin/ng.js).
+CLOUD_NODE_VERSION=22.22.3
 BACKEND_PID=""
 FRONTEND_PID=""
 
@@ -59,6 +63,10 @@ wait_for_http() {
   local attempts="${3:-90}"
   local i
   for ((i = 1; i <= attempts; i++)); do
+    if [[ -n "${FRONTEND_PID}" ]] && ! kill -0 "${FRONTEND_PID}" 2>/dev/null; then
+      echo "error: Angular exited before ${label} became ready." >&2
+      return 1
+    fi
     if curl -sf -o /dev/null --max-time 2 "${url}"; then
       echo "${label} is ready (${url})"
       return 0
@@ -67,6 +75,103 @@ wait_for_http() {
   done
   echo "warning: ${label} did not become ready at ${url}" >&2
   return 1
+}
+
+# Angular 22 accepts ^22.22.3 || ^24.15.0 || >=26.0.0. NG_DISABLE_VERSION_CHECK
+# does not skip the hard exit in @angular/cli/bin/ng.js.
+is_supported_node() {
+  command -v node >/dev/null 2>&1 || return 1
+  local raw major minor patch
+  raw="$(node -p "process.versions.node" 2>/dev/null)" || return 1
+  IFS=. read -r major minor patch <<<"${raw}"
+  major="${major:-0}"
+  minor="${minor:-0}"
+  patch="${patch:-0}"
+  if ((major == 22 && (minor > 22 || (minor == 22 && patch >= 3)))); then
+    return 0
+  fi
+  if ((major == 24 && minor >= 15)); then
+    return 0
+  fi
+  if ((major >= 26)); then
+    return 0
+  fi
+  return 1
+}
+
+node_dist_triple() {
+  local os arch
+  os="$(uname -s)"
+  arch="$(uname -m)"
+  case "${os}" in
+    Linux) os=linux ;;
+    Darwin) os=darwin ;;
+    *)
+      echo "error: unsupported OS for portable Node: ${os}" >&2
+      return 1
+      ;;
+  esac
+  case "${arch}" in
+    x86_64) arch=x64 ;;
+    aarch64 | arm64) arch=arm64 ;;
+    *)
+      echo "error: unsupported CPU for portable Node: ${arch}" >&2
+      return 1
+      ;;
+  esac
+  echo "${os}-${arch}"
+}
+
+download_portable_node() {
+  local dest_parent="$1"
+  local triple="$2"
+  local name="node-v${CLOUD_NODE_VERSION}-${triple}"
+  local url_base="https://nodejs.org/dist/v${CLOUD_NODE_VERSION}"
+  local tmp delay attempt
+  tmp="$(mktemp -d)"
+  delay=4
+  mkdir -p "${dest_parent}"
+  for attempt in 1 2 3 4; do
+    if curl -fsSL "${url_base}/${name}.tar.xz" -o "${tmp}/node.tar.xz" \
+      && tar -xJf "${tmp}/node.tar.xz" -C "${dest_parent}"; then
+      rm -rf "${tmp}"
+      return 0
+    fi
+    if curl -fsSL "${url_base}/${name}.tar.gz" -o "${tmp}/node.tar.gz" \
+      && tar -xzf "${tmp}/node.tar.gz" -C "${dest_parent}"; then
+      rm -rf "${tmp}"
+      return 0
+    fi
+    echo "Node v${CLOUD_NODE_VERSION} download failed (attempt ${attempt}); retrying in ${delay}s..."
+    sleep "${delay}"
+    delay=$((delay * 2))
+  done
+  rm -rf "${tmp}"
+  echo "error: could not download Node v${CLOUD_NODE_VERSION} for ${triple}" >&2
+  return 1
+}
+
+ensure_supported_node() {
+  if is_supported_node; then
+    echo "Using host Node $(node -v) (meets Angular 22 floor)."
+    return 0
+  fi
+  local host_ver triple node_home
+  host_ver="$(node -v 2>/dev/null || echo "none")"
+  echo "Host Node ${host_ver} is below Angular 22's floor (v${CLOUD_NODE_VERSION})."
+  triple="$(node_dist_triple)"
+  node_home="${ROOT}/.node/node-v${CLOUD_NODE_VERSION}-${triple}"
+  if [[ ! -x "${node_home}/bin/node" ]]; then
+    echo "Installing portable Node v${CLOUD_NODE_VERSION} into ${node_home} ..."
+    download_portable_node "${ROOT}/.node" "${triple}"
+  fi
+  export PATH="${node_home}/bin:${PATH}"
+  hash -r
+  if ! is_supported_node; then
+    echo "error: portable Node did not come up as v${CLOUD_NODE_VERSION}+ (now $(node -v 2>/dev/null || echo none))" >&2
+    return 1
+  fi
+  echo "Using portable Node $(node -v) from ${node_home}."
 }
 
 trap cleanup EXIT INT TERM
@@ -96,6 +201,16 @@ if [[ ! -f "${BACKEND_DIR}/.env" ]]; then
   fi
 fi
 
+# --- Node (Angular CLI hard-requires >= 22.22.3) -----------------------------
+ensure_supported_node
+
+FRONTEND_DIR="${ROOT}/frontend"
+
+if [[ ! -d "${FRONTEND_DIR}/node_modules" ]]; then
+  echo "Installing frontend dependencies..."
+  (cd "${FRONTEND_DIR}" && npm ci)
+fi
+
 free_port "${BACKEND_PORT}"
 free_port "${FRONTEND_PORT}"
 
@@ -105,14 +220,6 @@ echo "Starting backend on http://${BIND_HOST}:${BACKEND_PORT} ..."
   exec uvicorn app.main:app --reload --host "${BIND_HOST}" --port "${BACKEND_PORT}"
 ) &
 BACKEND_PID=$!
-
-# --- Frontend ----------------------------------------------------------------
-FRONTEND_DIR="${ROOT}/frontend"
-
-if [[ ! -d "${FRONTEND_DIR}/node_modules" ]]; then
-  echo "Installing frontend dependencies..."
-  (cd "${FRONTEND_DIR}" && npm ci)
-fi
 
 echo "Starting frontend on http://${BIND_HOST}:${FRONTEND_PORT} ..."
 (
@@ -128,7 +235,11 @@ FRONTEND_PID=$!
 echo ""
 echo "Waiting for Cloud Desktop listeners..."
 wait_for_http "http://127.0.0.1:${BACKEND_PORT}/api/maps" "API" || true
-wait_for_http "http://127.0.0.1:${FRONTEND_PORT}/" "App" || true
+if ! wait_for_http "http://127.0.0.1:${FRONTEND_PORT}/" "App"; then
+  echo "error: the Angular app never started on port ${FRONTEND_PORT}." >&2
+  echo "error: Cloud Desktop preview of port ${BACKEND_PORT} is the API — GET / is a 404." >&2
+  exit 1
+fi
 
 echo ""
 echo "MolfMaps is running for Cloud Desktop:"
