@@ -1,27 +1,62 @@
 #!/usr/bin/env bash
-# Start MolfMaps inside a Cursor Cloud Agent VM.
+# Start MolfMaps inside a Cursor Cloud Agent VM as a single origin.
 #
-# The laptop `./run` script binds Angular to 127.0.0.1:4200. Cloud Agent
-# preview/port-forwarding only reaches processes listening on 0.0.0.0, and
-# the forwarded Host header is not localhost, so Vite must allow all hosts.
-# The SPA therefore listens on 0.0.0.0:3000 (Cursor's usual preview port);
-# FastAPI stays on 8000 and is reached through the existing /api proxy.
+# Why this is not ./run:
+#   1. Cloud preview only reaches 0.0.0.0 (not 127.0.0.1:4200).
+#   2. Login shells here often put nvm Node v22.22.2 first. Angular CLI 22
+#      requires >= v22.22.3, so `ng serve` exits and only FastAPI remains.
+#      Opening that API port shows GET / → 404 (no SPA). Locally a newer
+#      Node starts Angular, so the same repo looks fine.
+#   3. Cursor forwards every listening port. If :8000 (API-only) and :3000
+#      (app) are both up, opening :8000 is a 404. Serve SPA+API on :3000 only.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BACKEND_HOST="${BACKEND_HOST:-127.0.0.1}"
-BACKEND_PORT="${BACKEND_PORT:-8000}"
-FRONTEND_HOST="${FRONTEND_HOST:-0.0.0.0}"
-FRONTEND_PORT="${FRONTEND_PORT:-3000}"
-BACKEND_PID=""
-FRONTEND_PID=""
+LISTEN_HOST="${LISTEN_HOST:-0.0.0.0}"
+APP_PORT="${APP_PORT:-3000}"
+# Leftover API-only servers from ./run or a previous run_cloud confuse preview.
+STALE_API_PORT="${STALE_API_PORT:-8000}"
+APP_PID=""
 
-# Disable Angular CLI interactive analytics prompt (breaks non-TTY / scripted runs).
 export NG_CLI_ANALYTICS=false
+
+node_supported() {
+  local bin="${1:-node}"
+  command -v "${bin}" >/dev/null 2>&1 || return 1
+  "${bin}" -e '
+    const [maj, min, pat] = process.versions.node.split(".").map(Number);
+    const ok =
+      (maj === 22 && (min > 22 || (min === 22 && pat >= 3))) ||
+      (maj === 24 && min >= 15) ||
+      maj >= 26;
+    process.exit(ok ? 0 : 1);
+  ' >/dev/null 2>&1
+}
+
+# nvm's v22.22.2 is on PATH in Cloud login shells but is one patch below
+# Angular CLI 22. Prefer /usr/local/bin (v24.15+) or /exec-daemon (v22.23+).
+select_supported_node() {
+  local bin dir
+  if node_supported node; then
+    echo "Using Node $(node -v) ($(command -v node))"
+    return 0
+  fi
+  echo "Active Node $(node -v 2>/dev/null || echo 'none') is too old for Angular CLI (need >= v22.22.3)."
+  for bin in /usr/local/bin/node /exec-daemon/node; do
+    if node_supported "${bin}"; then
+      dir="$(dirname "${bin}")"
+      export PATH="${dir}:${PATH}"
+      hash -r
+      echo "Switched to Node $(node -v) (${bin})"
+      return 0
+    fi
+  done
+  echo "error: no Node >= v22.22.3 found. Install one, or run: nvm install 22.22.3" >&2
+  exit 1
+}
 
 free_port() {
   local port="$1"
-  # Cursor infrastructure listens on 26000-26999 — never steal those.
   if [[ "${port}" -ge 26000 && "${port}" -le 26999 ]]; then
     echo "error: port ${port} is reserved for Cursor Cloud internals" >&2
     exit 1
@@ -45,11 +80,14 @@ free_port() {
 wait_http() {
   local url="$1"
   local name="$2"
-  local attempts="${3:-90}"
-  local i
+  local needle="${3:-}"
+  local attempts="${4:-90}"
+  local i body
   for ((i = 1; i <= attempts; i++)); do
-    if curl -sf -o /dev/null --max-time 2 "${url}"; then
-      return 0
+    if body="$(curl -sf --max-time 2 "${url}" 2>/dev/null)"; then
+      if [[ -z "${needle}" || "${body}" == *"${needle}"* ]]; then
+        return 0
+      fi
     fi
     sleep 1
   done
@@ -60,24 +98,22 @@ wait_http() {
 cleanup() {
   echo ""
   echo "Stopping MolfMaps (cloud)..."
-  if [[ -n "${FRONTEND_PID}" ]] && kill -0 "${FRONTEND_PID}" 2>/dev/null; then
-    kill "${FRONTEND_PID}" 2>/dev/null || true
-    wait "${FRONTEND_PID}" 2>/dev/null || true
+  if [[ -n "${APP_PID}" ]] && kill -0 "${APP_PID}" 2>/dev/null; then
+    kill "${APP_PID}" 2>/dev/null || true
+    wait "${APP_PID}" 2>/dev/null || true
   fi
-  if [[ -n "${BACKEND_PID}" ]] && kill -0 "${BACKEND_PID}" 2>/dev/null; then
-    kill "${BACKEND_PID}" 2>/dev/null || true
-    wait "${BACKEND_PID}" 2>/dev/null || true
-  fi
-  free_port "${FRONTEND_PORT}"
-  free_port "${BACKEND_PORT}"
+  free_port "${APP_PORT}"
   echo "Stopped."
 }
 
 trap cleanup EXIT INT TERM
 
-# --- Backend -----------------------------------------------------------------
+select_supported_node
+
 BACKEND_DIR="${ROOT}/backend"
+FRONTEND_DIR="${ROOT}/frontend"
 VENV="${BACKEND_DIR}/.venv"
+DIST="${FRONTEND_DIR}/dist/frontend/browser"
 
 if [[ ! -d "${VENV}" ]]; then
   echo "Creating backend virtualenv..."
@@ -100,45 +136,36 @@ if [[ ! -f "${BACKEND_DIR}/.env" ]]; then
   fi
 fi
 
-free_port "${BACKEND_PORT}"
-free_port "${FRONTEND_PORT}"
-
-echo "Starting backend on http://${BACKEND_HOST}:${BACKEND_PORT} ..."
-(
-  cd "${BACKEND_DIR}"
-  exec uvicorn app.main:app --reload --host "${BACKEND_HOST}" --port "${BACKEND_PORT}"
-) &
-BACKEND_PID=$!
-
-# --- Frontend ----------------------------------------------------------------
-FRONTEND_DIR="${ROOT}/frontend"
-
 if [[ ! -d "${FRONTEND_DIR}/node_modules" ]]; then
   echo "Installing frontend dependencies..."
   (cd "${FRONTEND_DIR}" && npm ci)
 fi
 
-echo "Starting frontend on http://${FRONTEND_HOST}:${FRONTEND_PORT} ..."
-(
-  cd "${FRONTEND_DIR}"
-  # --allowed-hosts: Cursor preview uses a generated Host, not localhost.
-  exec npm start -- \
-    --host "${FRONTEND_HOST}" \
-    --port "${FRONTEND_PORT}" \
-    --allowed-hosts
-) &
-FRONTEND_PID=$!
+echo "Building Angular app (Node $(node -v))..."
+(cd "${FRONTEND_DIR}" && npm run build -- --configuration development)
+if [[ ! -f "${DIST}/index.html" ]]; then
+  echo "error: Angular build did not produce ${DIST}/index.html" >&2
+  exit 1
+fi
 
-wait_http "http://127.0.0.1:${BACKEND_PORT}/api/session" "backend"
-wait_http "http://127.0.0.1:${FRONTEND_PORT}/" "frontend"
+free_port "${APP_PORT}"
+free_port "${STALE_API_PORT}"
+
+echo "Starting MolfMaps (SPA + API) on http://${LISTEN_HOST}:${APP_PORT} ..."
+(
+  cd "${BACKEND_DIR}"
+  exec uvicorn app.main:app --reload --host "${LISTEN_HOST}" --port "${APP_PORT}"
+) &
+APP_PID=$!
+
+wait_http "http://127.0.0.1:${APP_PORT}/api/session" "API"
+wait_http "http://127.0.0.1:${APP_PORT}/" "app" "app-root"
 
 echo ""
 echo "MolfMaps is running in Cursor Cloud:"
-echo "  API:  http://127.0.0.1:${BACKEND_PORT}  (internal; proxied via the app)"
-echo "  App:  http://127.0.0.1:${FRONTEND_PORT}  (bind ${FRONTEND_HOST}; forward this port)"
-echo "        /api is proxied to :${BACKEND_PORT}"
+echo "  App+API: http://127.0.0.1:${APP_PORT}  (bind ${LISTEN_HOST})"
 echo ""
-echo "Open the forwarded port ${FRONTEND_PORT} in the Cloud Agent preview."
-echo "Press Ctrl+C to stop both."
+echo "Open forwarded port ${APP_PORT} — do not use :${STALE_API_PORT} (API-only 404)."
+echo "Press Ctrl+C to stop."
 
 wait
