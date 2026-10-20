@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+# Start MolfMaps inside a Cursor Cloud Agent VM.
+#
+# The laptop `./run` script binds Angular to 127.0.0.1:4200. Cloud Agent
+# preview/port-forwarding only reaches processes listening on 0.0.0.0, and
+# the forwarded Host header is not localhost, so Vite must allow all hosts.
+# The SPA therefore listens on 0.0.0.0:3000 (Cursor's usual preview port);
+# FastAPI stays on 8000 and is reached through the existing /api proxy.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKEND_HOST="${BACKEND_HOST:-127.0.0.1}"
+BACKEND_PORT="${BACKEND_PORT:-8000}"
+FRONTEND_HOST="${FRONTEND_HOST:-0.0.0.0}"
+FRONTEND_PORT="${FRONTEND_PORT:-3000}"
+BACKEND_PID=""
+FRONTEND_PID=""
+
+# Disable Angular CLI interactive analytics prompt (breaks non-TTY / scripted runs).
+export NG_CLI_ANALYTICS=false
+
+free_port() {
+  local port="$1"
+  # Cursor infrastructure listens on 26000-26999 — never steal those.
+  if [[ "${port}" -ge 26000 && "${port}" -le 26999 ]]; then
+    echo "error: port ${port} is reserved for Cursor Cloud internals" >&2
+    exit 1
+  fi
+  local pids
+  pids="$(lsof -tiTCP:"${port}" -sTCP:LISTEN 2>/dev/null || true)"
+  if [[ -z "${pids}" ]]; then
+    return 0
+  fi
+  echo "Port ${port} is in use — stopping PID(s): ${pids}"
+  # shellcheck disable=SC2086
+  kill ${pids} 2>/dev/null || true
+  sleep 0.5
+  pids="$(lsof -tiTCP:"${port}" -sTCP:LISTEN 2>/dev/null || true)"
+  if [[ -n "${pids}" ]]; then
+    # shellcheck disable=SC2086
+    kill -9 ${pids} 2>/dev/null || true
+  fi
+}
+
+wait_http() {
+  local url="$1"
+  local name="$2"
+  local attempts="${3:-90}"
+  local i
+  for ((i = 1; i <= attempts; i++)); do
+    if curl -sf -o /dev/null --max-time 2 "${url}"; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "error: ${name} did not become ready at ${url}" >&2
+  return 1
+}
+
+cleanup() {
+  echo ""
+  echo "Stopping MolfMaps (cloud)..."
+  if [[ -n "${FRONTEND_PID}" ]] && kill -0 "${FRONTEND_PID}" 2>/dev/null; then
+    kill "${FRONTEND_PID}" 2>/dev/null || true
+    wait "${FRONTEND_PID}" 2>/dev/null || true
+  fi
+  if [[ -n "${BACKEND_PID}" ]] && kill -0 "${BACKEND_PID}" 2>/dev/null; then
+    kill "${BACKEND_PID}" 2>/dev/null || true
+    wait "${BACKEND_PID}" 2>/dev/null || true
+  fi
+  free_port "${FRONTEND_PORT}"
+  free_port "${BACKEND_PORT}"
+  echo "Stopped."
+}
+
+trap cleanup EXIT INT TERM
+
+# --- Backend -----------------------------------------------------------------
+BACKEND_DIR="${ROOT}/backend"
+VENV="${BACKEND_DIR}/.venv"
+
+if [[ ! -d "${VENV}" ]]; then
+  echo "Creating backend virtualenv..."
+  python3 -m venv "${VENV}"
+  # shellcheck disable=SC1091
+  source "${VENV}/bin/activate"
+  pip install -r "${BACKEND_DIR}/requirements.txt"
+else
+  # shellcheck disable=SC1091
+  source "${VENV}/bin/activate"
+fi
+
+if [[ ! -f "${BACKEND_DIR}/.env" ]]; then
+  if [[ -f "${BACKEND_DIR}/.env.example" ]]; then
+    echo "No backend/.env found — copying from .env.example"
+    cp "${BACKEND_DIR}/.env.example" "${BACKEND_DIR}/.env"
+  else
+    echo "error: backend/.env is missing (and no .env.example to copy)" >&2
+    exit 1
+  fi
+fi
+
+free_port "${BACKEND_PORT}"
+free_port "${FRONTEND_PORT}"
+
+echo "Starting backend on http://${BACKEND_HOST}:${BACKEND_PORT} ..."
+(
+  cd "${BACKEND_DIR}"
+  exec uvicorn app.main:app --reload --host "${BACKEND_HOST}" --port "${BACKEND_PORT}"
+) &
+BACKEND_PID=$!
+
+# --- Frontend ----------------------------------------------------------------
+FRONTEND_DIR="${ROOT}/frontend"
+
+if [[ ! -d "${FRONTEND_DIR}/node_modules" ]]; then
+  echo "Installing frontend dependencies..."
+  (cd "${FRONTEND_DIR}" && npm ci)
+fi
+
+echo "Starting frontend on http://${FRONTEND_HOST}:${FRONTEND_PORT} ..."
+(
+  cd "${FRONTEND_DIR}"
+  # --allowed-hosts: Cursor preview uses a generated Host, not localhost.
+  exec npm start -- \
+    --host "${FRONTEND_HOST}" \
+    --port "${FRONTEND_PORT}" \
+    --allowed-hosts
+) &
+FRONTEND_PID=$!
+
+wait_http "http://127.0.0.1:${BACKEND_PORT}/api/session" "backend"
+wait_http "http://127.0.0.1:${FRONTEND_PORT}/" "frontend"
+
+echo ""
+echo "MolfMaps is running in Cursor Cloud:"
+echo "  API:  http://127.0.0.1:${BACKEND_PORT}  (internal; proxied via the app)"
+echo "  App:  http://127.0.0.1:${FRONTEND_PORT}  (bind ${FRONTEND_HOST}; forward this port)"
+echo "        /api is proxied to :${BACKEND_PORT}"
+echo ""
+echo "Open the forwarded port ${FRONTEND_PORT} in the Cloud Agent preview."
+echo "Press Ctrl+C to stop both."
+
+wait
