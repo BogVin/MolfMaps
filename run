@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Start MolfMaps backend (FastAPI :8000) and frontend (Angular :4200) together.
+# For Cursor Cloud Agents use ./run_cloud instead (SPA+API on 0.0.0.0:3000).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
